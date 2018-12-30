@@ -1,9 +1,6 @@
 [submodule "public"]
 	path = public
-	url = https://github.com/greyby/greyby.github.io.git
-[submodule "themes/casper"]
-	path = themes/casper
-	url = https://github.com/greyby/hugo-theme-casper.git
+	url = https://github.com/yufulou/yufulou.github.io.git
 [submodule "themes/ananke"]
 	path = themes/ananke
 	url = https://github.com/budparr/gohugo-theme-ananke.git
