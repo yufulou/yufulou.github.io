@@ -4,6 +4,7 @@ git:
   depth: 1
 install: go get -v github.com/gohugoio/hugo
 script:
+  - export PATH=$PATH:$GOPATH/bin
   ‐ hugo
 deploy:
   provider: pages
