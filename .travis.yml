@@ -8,8 +8,7 @@ install:
   - hugo version
   - ls
   - pwd
-script:
-  ‐ hugo
+script: hugo
 deploy:
   provider: pages
   skip_cleanup: true
