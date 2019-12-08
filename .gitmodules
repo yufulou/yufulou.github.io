@@ -6,4 +6,4 @@
 	url = https://github.com/budparr/gohugo-theme-ananke.git
 [submodule "themes/hugo-future-imperfect"]
 	path = themes/hugo-future-imperfect
-	url = git@github.com:jpescador/hugo-future-imperfect.git
+	url = https://github.com/jpescador/hugo-future-imperfect.git
