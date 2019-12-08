@@ -1,10 +1,23 @@
 sudo: false
 language: go
+
+env:
+  global:
+    - CACHE_NAME=${TRAVIS_ARCH}
+    - GO111MODULE=on
+    - GOPROXY=https://proxy.golang.org
+    - HUGO_BUILD_TAGS=extended
+    - PATH=$PATH:$GOPATH/bin
+
+go:
+  - "1.12.13"
+  - "1.13.4"
+  - master
+
 git:
   depth: 1
 install:
   - go get -v github.com/gohugoio/hugo
-  - export PATH=$PATH:$GOPATH/bin
 script:
   ‐ hugo
 deploy:
