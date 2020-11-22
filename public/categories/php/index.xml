@@ -1,26 +1,0 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>php on yufulou&#39;s </title>
-    <link>/categories/php/</link>
-    <description>Recent content in php on yufulou&#39;s </description>
-    <generator>Hugo -- gohugo.io</generator>
-    <language>en-us</language>
-    <lastBuildDate>Wed, 31 Oct 2018 23:57:52 +0800</lastBuildDate>
-    
-	<atom:link href="/categories/php/index.xml" rel="self" type="application/rss+xml" />
-    
-    
-    <item>
-      <title>增加俩php5.2.17的.gdbinit方法</title>
-      <link>/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/</link>
-      <pubDate>Wed, 31 Oct 2018 23:57:52 +0800</pubDate>
-      
-      <guid>/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/</guid>
-      <description>最近，因为经常遇到print_cvs打印失败直接退出的问题，故做了两个方法，打印所有当前的变量名和单个变量，加到现有的.gdbinit就能用
-同时记得老版本的print_zv打印的地址是错的，要把printf后面的参数改成[%p]
-define print_vars____executor_globalsset $p = $eg.current_execute_data.CVsset $c = $eg.current_execute_data.op_array.last_varset $v = $eg.current_execute_data.op_array.varsset $i = 0printf &amp;#34;Compiled variables count: %d\n&amp;#34;, $cwhile $i &amp;lt; $cprintf &amp;#34;%d = %s [%p] \n&amp;#34;, $i, $v[$i].name, *$p[$i]set $i = $i + 1endenddocument print_varsprint all var namesenddefine print_var____executor_globalsset $p = $eg.current_execute_data.CVsset $c = $eg.current_execute_data.op_array.last_varset $v = $eg.current_execute_data.op_array.varsset $i = 0set $varname = $arg0set $found_var = 0printf &amp;#34;Compiled variables count: %d\n&amp;#34;, $cprintf &amp;#34;to print var name %s\n&amp;#34;, $varnamewhile $i &amp;lt; $c &amp;amp;&amp;amp; 0 == $found_varif strcmp($varname, $v[$i].</description>
-    </item>
-    
-  </channel>
-</rss>
