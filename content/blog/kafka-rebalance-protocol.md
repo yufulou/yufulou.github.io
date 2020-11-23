@@ -86,8 +86,12 @@ Now that we have a better understanding of what the rebalance protocol is, let�
 
 JoinGroup
 When a consumer starts, it sends a first FindCoordinator request to obtain the Kafka broker coordinator which is responsible for its group. Then, it initiates the rebalance protocol by sending a JoinGroup request.
+当consumer启动时，它会发送一个FindCoordinator请求获取负责协调所在消费组的Kafka broker coordinator，随后便通过发送JoinGroup请求初始化Rebalance protocol
+
 Image for post
+
 Consumer — Rebalance Protocol — SyncGroup Request
+
 As we can see, the JoinGroup contains some consumer client configuration such as the session.timeout.ms and the max.poll.interval.ms. These properties are used by the coordinator to kick members out of the group if they don’t respond.
 In addition, the request also contains two very important fields: the list of client protocols, supported by the members, and metadata that will be used for executing one of the embedded client protocols. In our case, the client-protocols are the list of partition assignors configured for the consumer (i.e : partition.assignment.strategy). Metadata contains the list of topics the consumer has subscribed to.
 Note that if you don’t know what these properties are for, I invite you to read the official documentation.

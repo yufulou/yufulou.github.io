@@ -2,8 +2,8 @@
 title = "Contact"
 type = "contact"
 netlify = false
-emailservice = "formspree.io/example@email.com"
-contactname = "Your Name"
-contactemail = "Your Email Address"
+emailservice = "yufulou@qq.com"
+contactname = "yufulou"
+contactemail = "yufulou@qq.com"
 contactmessage = "Your Message"
 +++
