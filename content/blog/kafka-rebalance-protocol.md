@@ -95,7 +95,7 @@ JoinGroup行为扮演着一个屏障的角色，即如果没收到consumer发送
 
 ![image](/img/blog/kafka-rebalance-protocol/Heartbeat.jpeg "Consumer — Rebalance Protocol — Heartbeat")
 
-在真实的分布式场景或者任何场景中，错误总会发生，硬件会损坏，网络或者consumer可能会发生无感知的错误。然而所有这些错误都会触发Rebalance。
+在真实的分布式场景或者任何场景中，错误总会发生，硬件会损坏，网络或者consumer可能会发生瞬时的错误。然而所有这些错误都会触发Rebalance。
 
 ## Some caveats
 首先，Rebalance protocol为了处理一个成员，必须要停止组内所有成员（STW效应）
@@ -110,31 +110,58 @@ JoinGroup行为扮演着一个屏障的角色，即如果没收到consumer发送
 
 在整个Rebalance过程中（partition被重新分配前），consumers不再处理任何数据。并且默认Rebalance超时时间被固定为5分钟，在不断增长的consumer时间延迟的场景中，这么长的超时时间会造成很大问题。
 
-就会发生这样的问题，比如consumer刚从一个无感知的错误中恢复，则他重新回到这个组时，就会触发一次Rebalance并且导致所有consumer停止（而在错误发生时已经STW了一次）
+就会发生这样的问题，比如，consumer刚从一个瞬时的错误中恢复，则他重新回到这个组时，就会触发一次Rebalance并且导致所有consumer停止（而在错误发生时已经STW了一次）
 
 ![image](/img/blog/kafka-rebalance-protocol/Restart.jpeg "Consumer — Rebalance Protocol — Restart")
 
-Another reason that can lead to a restart of a consumer is a rolling upgrade of the group. This scenario is unfortunately disastrous for the consumption group. Indeed, with a group of three consumers, such operation will trigger 6 rebalances that could potentially have a significant impact on messages processing.
+另外一个导致重启的原因是全组成员滚动升级，这对consumption group是一个十分严重情况。对一个有三个consumer的组，这种操作会触发6次Rebalance，从而严重影响到消息处理过程
 
+最后要说，在Java环境下运行的kafka consumer通常会有这两个常见问题：
+1. 丢失heartbeat请求 -- 可能由于网络超时，gc暂停
+2. 没有定期执行KafkaConsumer#poll()方法 -- 由于一个长时间的消息处理
+在问题1的场景中，coordinator在session.timeout.ms配置的时间内，没有收到heartbeat请求，认为这个consumer已经挂掉了。
+在问题2的场景中，处理拉取到的消息的时间超过了max.poll.inteval.ms配置的时间。
 
-Finally, a common problem when running Kafka consumers, in Java, is either missing a heartbeat request, due to a network outage or a long GC pause, or not invoking the method KafkaConsumer#poll(), periodically, due to an excessive processing time. In the first case, the coordinator is not receiving a heartbeat for more thansession.timeout.ms milliseconds and considers the consumer dead. In the second one, the time needed for processing polled records is superior to max.poll.inteval.ms.
 Image for post
 Consumer — Rebalance Protocol — Timeout
-Static Membership
-To reduce consumer rebalances due to transient failures, Apache Kafka 2.3 introduces the concept of Static Membership with the KIP-345.
+
+# Static Membership
+为了减少由于consumer发生瞬时失败导致的Rebalance，Apache Kafka 2.3版本引入了Static Membership的概念（KIP-345）
+
 The main idea behind static membership is that each consumer instance is attached to a unique identifier configured with group.instance.id. The membership protocol has been extended so that ids are propagated to the broker coordinator through the JoinGroup request.
+static membership的主要方案是每个consumer绑定一个唯一标识id（配置于group.instance.id），并且这些consumer的id会在发送JoinGroup请求时发送给coordinator -- 依据扩展后Membership protocol
+
 Image for post
+
+
 If a consumer is restarted or killed due to a transient failure, the broker coordinator will not inform other consumers that a rebalance is necessary until session.timeout.msis reached. One reason for that is that consumers will not sendLeaveGroup request when they are stopped.
+如果一个consumer重启或者由于瞬时错误而被kill了，因为这个consumer不是通过正常发送LeaveGroup请求而停止的，则在触达session.timeout.ms时间以前，broker coordinator不会通知其他consumer进行Rebalance流程
+
 Image for post
+
 When the consumer will finally rejoin the group, the broker coordinator will return the cached assignment back to it, without doing any rebalance.
+当这个consumer从错误恢复，并重新回到组时，broker coordinator会把之前缓存了的任务重新发给他，而不用经历任何Rebalance过程
+
 Image for post
+
 When using static membership, it’s recommended to increase the consumer propertysession.timeout.mslarge enough so that the broker coordinator will not trigger rebalance too frequently.
+当使用static membership时，建议加大consumer的session.timeout.ms的属性值，以防broker coordinator会频繁触发Rebalance。
+
 On the one hand, static membership can be very useful for limiting the number of undesirable rebalances and thus minimizing stop-the-world effect. On the other hand, this has the disadvantage of increasing the unavailability of partitions because the coordinating broker may only detect a failing consumer after a few minutes (depending onsession.timeout.ms). Unfortunately, this is the eternal trade-off between availability and fault-tolerance you have to make in a distributed system.
-Incremental Cooperative Rebalancing
+一方面说，static membership机制可以有效避免无效的Rebalance从而最少化STW影响。但从另一方面，这也降低了partition的可用性，因为coordinator可能要数分钟后（session.timeout.ms）才能检测到一个挂掉的consumer。然而，这即是我们在分布式系统中永恒的话题：可用性VS分区容错性（译注：不应该是可用性和一致性么？）
+
+
+# Incremental Cooperative Rebalancing
 As of version 2.3, Apache Kafka also introduces new embedded protocols to improve the resource availability of each member while minimizing stop-the-world effect.
+除了减少STW影响的改进，在Apache Kafka 2.3版中还引入了一些新的embedded protocol来增强资源可用性。
+
 The basic idea behind these new protocols, is to perform rebalancing incrementally and in cooperation — In other words, it means executing multiple rebalance rounds rather than a global one.
+这些新增protocol的主要想法是：增量和协作地Rebalance，换句话说，这也意味着要执行多次Rebalance
+
 Incremental Cooperative Rebalancing was first implemented for Kafka Connect through the KIP-415 (partially implemented in Kafka 2.3). Moreover, it will be available for streams and consumers from Kafka 2.4 through the KIP-429.
-Kafka Connect Limitations
+增量协作地Rebalance最开始被Kafka Connect引入（KIP-415，Kafka2.3也部分实现了）。并会在Kafka 2.4版本中对stream和consumer可用（KIP-429）
+
+## Kafka Connect Limitations
 Kafka Connect uses the group membership protocol to distribute connectors and tasks evenly among workers that compose a connect cluster. Thus, workers coordinate each other to rebalance connectors and tasks when a node fails/restart, tasks scales up/down and when configuration is submitted/updated.
 However, before Kafka 2.3, whenever one of these scenarios occurred, the execution of all existing connectors was interrupted (i.e stop-the-word). Therefore, it was difficult to scale up a mutualized cluster with several dozens of connectors.
 The Incremental Cooperative Rebalancing attempts to solve this problem in two ways :
