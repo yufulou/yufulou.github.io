@@ -126,7 +126,7 @@ JoinGroup行为扮演着一个屏障的角色，即如果没收到consumer发送
 
 在问题2的场景中，处理拉取到的消息的时间超过了max.poll.inteval.ms配置的时间。
 
-![image](/img/blog/kafka-rebalance-protocol/ "Consumer — Rebalance Protocol — Timeout")
+![image](/img/blog/kafka-rebalance-protocol/Timeout.jpeg "Consumer — Rebalance Protocol — Timeout")
 
 
 # Static Membership
