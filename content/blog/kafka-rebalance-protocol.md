@@ -1,5 +1,5 @@
 +++
-title= "【译】【原】【未完】kafka rebalance 协议详解"
+title= "【译】【原】kafka rebalance 协议详解"
 date= 2020-11-22T16:05:52+08:00
 categories = ["kafka"]
 description = ""
@@ -117,90 +117,119 @@ JoinGroup行为扮演着一个屏障的角色，即如果没收到consumer发送
 另外一个导致重启的原因是全组成员滚动升级，这对consumption group是一个十分严重情况。对一个有三个consumer的组，这种操作会触发6次Rebalance，从而严重影响到消息处理过程
 
 最后要说，在Java环境下运行的kafka consumer通常会有这两个常见问题：
+
 1. 丢失heartbeat请求 -- 可能由于网络超时，gc暂停
-2. 没有定期执行KafkaConsumer#poll()方法 -- 由于一个长时间的消息处理
+
+2. 没有定期执行KafkaConsumer#poll()方法 -- 由于一次消息处理太久超时
+
 在问题1的场景中，coordinator在session.timeout.ms配置的时间内，没有收到heartbeat请求，认为这个consumer已经挂掉了。
+
 在问题2的场景中，处理拉取到的消息的时间超过了max.poll.inteval.ms配置的时间。
 
-Image for post
-Consumer — Rebalance Protocol — Timeout
+![image](/img/blog/kafka-rebalance-protocol/ "Consumer — Rebalance Protocol — Timeout")
+
 
 # Static Membership
 为了减少由于consumer发生瞬时失败导致的Rebalance，Apache Kafka 2.3版本引入了Static Membership的概念（KIP-345）
 
-The main idea behind static membership is that each consumer instance is attached to a unique identifier configured with group.instance.id. The membership protocol has been extended so that ids are propagated to the broker coordinator through the JoinGroup request.
 static membership的主要方案是每个consumer绑定一个唯一标识id（配置于group.instance.id），并且这些consumer的id会在发送JoinGroup请求时发送给coordinator -- 依据扩展后Membership protocol
 
-Image for post
+![image](/img/blog/kafka-rebalance-protocol/JoinGroup2.jpeg "")
 
-
-If a consumer is restarted or killed due to a transient failure, the broker coordinator will not inform other consumers that a rebalance is necessary until session.timeout.msis reached. One reason for that is that consumers will not sendLeaveGroup request when they are stopped.
 如果一个consumer重启或者由于瞬时错误而被kill了，因为这个consumer不是通过正常发送LeaveGroup请求而停止的，则在触达session.timeout.ms时间以前，broker coordinator不会通知其他consumer进行Rebalance流程
 
-Image for post
+![image](/img/blog/kafka-rebalance-protocol/Restarting-Or-Killed-Due-To-Transient-Failure.jpeg "")
 
-When the consumer will finally rejoin the group, the broker coordinator will return the cached assignment back to it, without doing any rebalance.
 当这个consumer从错误恢复，并重新回到组时，broker coordinator会把之前缓存了的任务重新发给他，而不用经历任何Rebalance过程
 
-Image for post
+![image](/img/blog/kafka-rebalance-protocol/IsRestarting.jpeg "")
 
-When using static membership, it’s recommended to increase the consumer propertysession.timeout.mslarge enough so that the broker coordinator will not trigger rebalance too frequently.
 当使用static membership时，建议加大consumer的session.timeout.ms的属性值，以防broker coordinator会频繁触发Rebalance。
 
-On the one hand, static membership can be very useful for limiting the number of undesirable rebalances and thus minimizing stop-the-world effect. On the other hand, this has the disadvantage of increasing the unavailability of partitions because the coordinating broker may only detect a failing consumer after a few minutes (depending onsession.timeout.ms). Unfortunately, this is the eternal trade-off between availability and fault-tolerance you have to make in a distributed system.
 一方面说，static membership机制可以有效避免无效的Rebalance从而最少化STW影响。但从另一方面，这也降低了partition的可用性，因为coordinator可能要数分钟后（session.timeout.ms）才能检测到一个挂掉的consumer。然而，这即是我们在分布式系统中永恒的话题：可用性VS分区容错性（译注：不应该是可用性和一致性么？）
 
 
 # Incremental Cooperative Rebalancing
-As of version 2.3, Apache Kafka also introduces new embedded protocols to improve the resource availability of each member while minimizing stop-the-world effect.
 除了减少STW影响的改进，在Apache Kafka 2.3版中还引入了一些新的embedded protocol来增强资源可用性。
 
-The basic idea behind these new protocols, is to perform rebalancing incrementally and in cooperation — In other words, it means executing multiple rebalance rounds rather than a global one.
 这些新增protocol的主要想法是：增量和协作地Rebalance，换句话说，这也意味着要执行多次Rebalance
 
-Incremental Cooperative Rebalancing was first implemented for Kafka Connect through the KIP-415 (partially implemented in Kafka 2.3). Moreover, it will be available for streams and consumers from Kafka 2.4 through the KIP-429.
 增量协作地Rebalance最开始被Kafka Connect引入（KIP-415，Kafka2.3也部分实现了）。并会在Kafka 2.4版本中对stream和consumer可用（KIP-429）
 
 ## Kafka Connect Limitations
-Kafka Connect uses the group membership protocol to distribute connectors and tasks evenly among workers that compose a connect cluster. Thus, workers coordinate each other to rebalance connectors and tasks when a node fails/restart, tasks scales up/down and when configuration is submitted/updated.
-However, before Kafka 2.3, whenever one of these scenarios occurred, the execution of all existing connectors was interrupted (i.e stop-the-word). Therefore, it was difficult to scale up a mutualized cluster with several dozens of connectors.
-The Incremental Cooperative Rebalancing attempts to solve this problem in two ways :
-1 ) only stop tasks/members for revoked resources.
-2 ) handle temporary imbalances in resource distribution among members, either immediately or deferred (useful for rolling restart).
-For doing that, the Incremental Cooperative Rebalancing principal is actually declined into three concrete designs:
-Design I: Simple Cooperative Rebalancing
-Design II: Deferred Resolution of Imbalance
-Design III: Incremental Resolution of Imbalance
-To give you a better understanding on how Incremental Cooperative Rebalancing works we are going to illustrate the design II in the context of Kafka Connect.
-Deferred Resolution of Imbalance
-First, let’s start with a simple connect cluster compose of three workers with this initial task/connector assignment :
-Image for post
-1 — Initial assignment
-Now, let’s imagine that W2 fails without any particular reason and leaves the group by session timeout. A rebalance is triggered and remaining workers W1 and W3 rejoin the group. While sending a JoinGroup request workers include their previous assignment. Assignments are shared using the existing field member_metadataof the Group Membership protocol.
-Image for post
-2 — W2 leaves the group and rebalance is triggered (W1, W3 join).
-W1 is elected as the group leader and performs tasks/connectors assignments by computing the difference with the previous assignments. Here, the leader detects that some task and connector are not presented in previous assignments.
-Image for post
-3 — W1 becomes leader and computes assignments
-W1 send the new assigned tasks/connectors as well as revoked. You can note that W1 will not actually try to resolve immediately missing assignment (or imbalance). Instead of that, it will deferred the resolution by scheduling a next rebalance to get a chance to the failing member to reappear. The scheduling delay is fixed by a new configuration scheduled.rebalance.max.delay.ms(by default, it is equal to 5 minutes).
-Note : With Incremental Cooperative Rebalancing, when a member receives a new assignment, it will start processing any new partitions (or tasks/connector). Moreover, if the assignment also contains revoked partitions then it stops processing, commit and then initiate another join group immediately. This has the effect of increasing the number of rebalancing but only stopping the resources whose assignment has changed.
-Image for post
-4 — W1, W3 receive assignments
-W2 rejoins the group before delay expires and another rebalance is triggered. W1 and W2 also rejoin the group.
-Image for post
-5 — B rejoins the group before delay expire and a rebalance is triggered
-However, W1 will not reassign missing task/connector until the scheduled rebalance delay expires.
-Image for post
-6 — W1 becomes leader and computes assignments
-After the remaining delay expires, a final rebalance is triggered and all workers rejoin the group.
-Image for post
-7 — W1, W2, W3 receive assignments
-Finally, the group leader reassigned A-Task-1 and Connector-B to W2. During all the rebalance sequence, W1 and W3 never stopped their assigned tasks.
-Image for post
-8 — After delay, all members join
-Conclusion
-The rebalancing protocol is an essential component of the consumption mechanism in Apache Kafka. But, it also serves as a generic protocol for coordinating group members and distributing resources among them (e.g Kafka Connect). Static Membership and Incremental Cooperative Rebalancing are both important features which provides a huge improvement to Apache Kafka by making this protocol more robust and scalable.
+Kafka Connect使用group membership protocol为组成connect集群的worker平均地分配connector和task。因此，当一个节点故障或重启，task扩容或缩容，配置提交或修改时，这些worker会相互协作地Rebalance connector和task
 
+然而在Kafka 2.3以前，不管以上哪种情况发生，所有已存在的connector都会被中断（像STW），因此，用多个connector去扩容一个相互作用的集群变成了一件非常困难的事
+
+增量协作地Rebalance尝试通过如下两种方法解决这个问题：
+
+1) 只有resource被回收才会停止task和member
+
+2) 处理临时的member资源分配不平衡，立即或延迟（延迟方案对滚动重启的情况很有用）
+
+为了实现上述方法，依据增量协作Rebalance原则，构成了如下3种方案：
+
+* Design I: 简单协作的Rebalancing
+
+* Design II: 延迟处理不平衡状态
+
+* Design III: 增量处理不平衡状态
+
+为了使你更好的理解增量协作的Rebalancing是如何工作的，下面要给你演示一下Kafka Connect是如何使用Design II的
+
+## Deferred Resolution of Imbalance
+首先，这是一个由3个worker构成的connect集群，同时被分配了task和connector
+
+![image](/img/blog/kafka-rebalance-protocol/Initial-assignment.jpeg "1 — Initial assignment")
+
+1 — Initial assignment
+
+现在，W2由于一些莫名原因挂掉了，在session timeout时间后离开了集群，Rebalance流程被触发，存活的W1和W3 rejoin到这个组，发送了包含他们上一次的分配记录的JoinGroup请求，分配记录是使用Group Membership protocol规定的member_metadata字段传输的。
+
+![image](/img/blog/kafka-rebalance-protocol/w2-leave-rebalance-is-triggered.jpeg "2 — W2 leaves the group and rebalance is triggered (W1, W3 join).")
+
+2 — W2 leaves the group and rebalance is triggered (W1, W3 join).
+
+W1被选为当前组的leader，他根据与上一次的分配计划，计算本次分配计划，此时W1会发现，上次一些上次分配计划中的task和connector不见了。
+
+![image](/img/blog/kafka-rebalance-protocol/leader-computes-assignments.jpeg "3 — W1 becomes leader and computes assignments")
+
+3 — W1 becomes leader and computes assignments
+
+W1发送他计算后的新的分配计划（包含之前被撤回的资源），你会发现W1实际不会马上解决当前那些未被分配的资源（或是分配不均的状态），他会安排另外一次延迟的Rebalance流程解决这个问题，从而给那个挂掉的成员一些时间自己恢复回来，这个延迟时间通过一个新增的配置设定：scheduled.rebalance.max.delay.ms，默认为5分钟
+
+注意：在增量协同Rebalancing时，当一个成员被分配一个新的分区，他会马上开始处理这个新分配的分区。然而，当其被分配到一个之前被撤回的分区时，他会停止处理，提交，并立即开启一个新的join group流程。这会导致增加一些Rebalancing次数，但只在给他的分配计划发生变化时才会发生。
+
+![image](/img/blog/kafka-rebalance-protocol/receive-assignments.jpeg "4 — W1, W3 receive assignments")
+
+4 — W1, W3 receive assignments
+
+W2在延迟超时时间以前重新回到组，并且触发了一次Rebalance。W1和W2也重新回到组。
+
+![image](/img/blog/kafka-rebalance-protocol/rebalance-is-triggered.jpeg "5 — B rejoins the group before delay expire and a rebalance is triggered")
+
+5 — B rejoins the group before delay expire and a rebalance is triggered
+
+然而，W1直到计划的Rebalance不会重新分配那些不见的task和connector
+
+![image](/img/blog/kafka-rebalance-protocol/not-reassign-missing-resources-until-delay-expires.jpeg "6 — W1 will not reassign missing resources until delay expires")
+
+6 — W1 will not reassign missing resources until delay expires
+
+在达到计划的超时时间后，最终的Rebalance被触发，所有worker执行rejoin流程
+
+![image](/img/blog/kafka-rebalance-protocol/all-receive-assignments.jpeg "7 — W1, W2, W3 receive assignments")
+
+7 — W1, W2, W3 receive assignments
+
+最终，组leader重新分配A-Task-1和Connector-B给W2，在所有这些过程里，W1和W3从来没有过停止处理一开始分配给他们的task。
+
+![image](/img/blog/kafka-rebalance-protocol/all-members-join.jpeg "8 — After delay, all members join")
+
+8 — After delay, all members join
+
+# Conclusion
+Rebalance protocol是Kafka消费机制的基础组件。但他同时也是一个面向一组互相协作的分组成员、并向这些成员分配资源（如Kafka Connect）的一种通用协议，增强这个协议的健壮性和可扩展性的同时，也使Static Membership和增量协同Rebalancing这两个特性对Apache Kafka产生极大的改进。
 
 To learn more about the rebalance protocol and how it works have a look to the following links.
 Sources :
