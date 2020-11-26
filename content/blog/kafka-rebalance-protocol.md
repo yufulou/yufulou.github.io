@@ -181,19 +181,16 @@ Kafka Connect使用group membership protocol为组成connect集群的worker平�
 首先，这是一个由3个worker构成的connect集群，同时被分配了task和connector
 
 ![image](/img/blog/kafka-rebalance-protocol/Initial-assignment.jpeg "1 — Initial assignment")
-
 1 — Initial assignment
 
 现在，W2由于一些莫名原因挂掉了，在session timeout时间后离开了集群，Rebalance流程被触发，存活的W1和W3 rejoin到这个组，发送了包含他们上一次的分配记录的JoinGroup请求，分配记录是使用Group Membership protocol规定的member_metadata字段传输的。
 
 ![image](/img/blog/kafka-rebalance-protocol/w2-leave-rebalance-is-triggered.jpeg "2 — W2 leaves the group and rebalance is triggered (W1, W3 join).")
-
 2 — W2 leaves the group and rebalance is triggered (W1, W3 join).
 
 W1被选为当前组的leader，他根据与上一次的分配计划，计算本次分配计划，此时W1会发现，上次一些上次分配计划中的task和connector不见了。
 
 ![image](/img/blog/kafka-rebalance-protocol/leader-computes-assignments.jpeg "3 — W1 becomes leader and computes assignments")
-
 3 — W1 becomes leader and computes assignments
 
 W1发送他计算后的新的分配计划（包含之前被撤回的资源），你会发现W1实际不会马上解决当前那些未被分配的资源（或是分配不均的状态），他会安排另外一次延迟的Rebalance流程解决这个问题，从而给那个挂掉的成员一些时间自己恢复回来，这个延迟时间通过一个新增的配置设定：scheduled.rebalance.max.delay.ms，默认为5分钟
@@ -201,31 +198,26 @@ W1发送他计算后的新的分配计划（包含之前被撤回的资源），
 注意：在增量协同Rebalancing时，当一个成员被分配一个新的分区，他会马上开始处理这个新分配的分区。然而，当其被分配到一个之前被撤回的分区时，他会停止处理，提交，并立即开启一个新的join group流程。这会导致增加一些Rebalancing次数，但只在给他的分配计划发生变化时才会发生。
 
 ![image](/img/blog/kafka-rebalance-protocol/receive-assignments.jpeg "4 — W1, W3 receive assignments")
-
 4 — W1, W3 receive assignments
 
 W2在延迟超时时间以前重新回到组，并且触发了一次Rebalance。W1和W2也重新回到组。
 
 ![image](/img/blog/kafka-rebalance-protocol/rebalance-is-triggered.jpeg "5 — B rejoins the group before delay expire and a rebalance is triggered")
-
 5 — B rejoins the group before delay expire and a rebalance is triggered
 
 然而，W1直到计划的Rebalance不会重新分配那些不见的task和connector
 
 ![image](/img/blog/kafka-rebalance-protocol/not-reassign-missing-resources-until-delay-expires.jpeg "6 — W1 will not reassign missing resources until delay expires")
-
 6 — W1 will not reassign missing resources until delay expires
 
 在达到计划的超时时间后，最终的Rebalance被触发，所有worker执行rejoin流程
 
 ![image](/img/blog/kafka-rebalance-protocol/all-receive-assignments.jpeg "7 — W1, W2, W3 receive assignments")
-
 7 — W1, W2, W3 receive assignments
 
 最终，组leader重新分配A-Task-1和Connector-B给W2，在所有这些过程里，W1和W3从来没有过停止处理一开始分配给他们的task。
 
 ![image](/img/blog/kafka-rebalance-protocol/all-members-join.jpeg "8 — After delay, all members join")
-
 8 — After delay, all members join
 
 # Conclusion
