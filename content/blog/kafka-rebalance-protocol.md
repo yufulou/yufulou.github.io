@@ -43,7 +43,7 @@ Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）K
 
 以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。
 
-这里是一些Rebalance Protocol的用法：
+这里是一些Rebalance Protocol的应用：
 
 * Confluence Schema Registry 依赖rebalancing选主。
 
@@ -70,7 +70,7 @@ Client Embedded Protocol是执行于客户端侧的协议，他通过嵌入第�
 
 此外，这个请求同时包含了两个非常重要的字段：成员支持的protocol列表，和被用于执行某个embedded client protocol的元数据。在这个例子里，成员协议列表是由partition的分配者为consumer配置的（比如，partition.assignment.strategy），元数据包含了consumer订阅了的topic列表。
 
-如果你不知道这些数据的功能，推荐你阅读官方文档。
+如果你不知道这些字段的功能，推荐你阅读官方文档。
 
 JoinGroup行为扮演着一个屏障的角色，即如果没收到consumer发送的请求（比如，在group.initial.rebalance.delay.ms限定的时间内），或者达到了Rebalance超时时间，那么coordinator就不会发送任何响应了。
 
@@ -190,7 +190,7 @@ Kafka Connect使用group membership protocol为组成connect集群的worker平�
 
 2 — W2 leaves the group and rebalance is triggered (W1, W3 join).
 
-W1被选为当前组的leader，他根据与上一次的分配计划，计算本次分配计划，此时W1会发现，上次一些上次分配计划中的task和connector不见了。
+W1被选为当前组的leader，他根据与上一次的分配计划，计算本次分配计划，此时W1会发现，一些上次分配计划中的task和connector不见了。
 
 ![image](/img/blog/kafka-rebalance-protocol/leader-computes-assignments.jpeg "3 — W1 becomes leader and computes assignments")
 
