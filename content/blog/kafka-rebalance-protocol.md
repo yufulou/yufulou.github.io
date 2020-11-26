@@ -210,7 +210,7 @@ W2在延迟超时时间以前重新回到组，并且触发了一次Rebalance。
 
 5 — B rejoins the group before delay expire and a rebalance is triggered
 
-然而，W1直到计划的Rebalance不会重新分配那些不见的task和connector
+然而，直到计划的Rebalance被触发，W1不会重新分配那些不见的task和connector
 
 ![image](/img/blog/kafka-rebalance-protocol/not-reassign-missing-resources-until-delay-expires.jpeg "6 — W1 will not reassign missing resources until delay expires")
 
