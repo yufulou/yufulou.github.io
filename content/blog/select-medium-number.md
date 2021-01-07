@@ -1,7 +1,7 @@
 +++
 title= "[转]在MySQL中，如何计算一组数据的中位数？"
 date= 2021-01-07T14:20:38+08:00
-categories = ["mysql"]
+categories = ["mysql", "sql"]
 description = ""
 featured = ""
 featuredalt = ""
@@ -10,7 +10,7 @@ linktitle = ""
 type = "post"
 +++
 
-原文链接：https://learnku.com/articles/18390
+原文链接地址：https://learnku.com/articles/18390
 
 要得到一组数据的中位数（例如某个地区或某家公司的收入中位数），我们一般要将这一任务细分为 3 个小任务：
 
