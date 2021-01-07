@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>js on yufulou&#39;s </title>
+    <link>/categories/js/</link>
+    <description>Recent content in js on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Tue, 29 Jul 2014 11:39:33 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/js/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>判断浏览器类型，系统类型的js和php代码</title>
+      <link>/blog/explorer-ua/</link>
+      <pubDate>Tue, 29 Jul 2014 11:39:33 +0800</pubDate>
+      
+      <guid>/blog/explorer-ua/</guid>
+      <description>同一套判断方式的两种写法
+php：
+class BrowserDetector { public $UA = &amp;quot;&amp;quot;; //$HTTP_USER_AGENT的内容 public $BROWSER_VERSION = array(); /* 构造函数开始 */ function __construct(){ $this-&amp;gt;UA = getenv(HTTP_USER_AGENT); $this-&amp;gt;BROWSER_VERSION = array( &amp;quot;trident&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Trident&#39;), //IE内核 &amp;quot;presto&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Presto&#39;), //opera内核 &amp;quot;webKit&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;AppleWebKit&#39;), //苹果、谷歌内核 &amp;quot;gecko&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Gecko&#39;) &amp;amp;&amp;amp; false === stripos($this-&amp;gt;UA, &#39;KHTML&#39;), //火狐内核 &amp;quot;mobile&amp;quot;=&amp;gt; 0 &amp;lt; preg_match(&#39;/AppleWebKit.*Mobile.*/i&#39;, $this-&amp;gt;UA) || 0 &amp;lt; preg_match(&#39;/AppleWebKit/i&#39;, $this-&amp;gt;UA), //是否为移动终端 &amp;quot;ios&amp;quot;=&amp;gt; 0 &amp;lt; preg_match(&#39;/(i[^;]+\;(U;)? CPU.+Mac OS X)/i&#39;, $this-&amp;gt;UA), //ios终端 &amp;quot;android&amp;quot;=&amp;gt; false !</description>
+    </item>
+    
+    <item>
+      <title>改变extjs4.1中tooltip的整体颜色</title>
+      <link>/blog/ext4-tooltip-color/</link>
+      <pubDate>Mon, 04 Mar 2013 20:40:34 +0800</pubDate>
+      
+      <guid>/blog/ext4-tooltip-color/</guid>
+      <description>1、尝试过用cls，style，都是在火狐，chrome，ie9上没问题，在ie8以下就有问题
+2、尝试过bodyStyle，能行，但是你会发现有个令人讨厌的蓝边（原始样式）
+然后在sencha论坛里发现有个哥们跟我遇到同样问题，是通过改baseCls解决的，确实好用，也不麻烦，贴出来大家共用，原帖地址（倒数第二个回帖）：http://www.sencha.com/forum/showthread.php?40155-Chang-background-color-in-a-tooltip
+但我的做法比他多一步，就是我重写了Ext.tip.ToolTip因为我用了gray这个theme，所以前面那个anchor是个灰色的，和我整体颜色不搭：
+Ext.define(&#39;Ech.ux.ToolTip&#39;, { extend: &#39;Ext.tip.ToolTip&#39;, alias: &#39;ech.tooltip&#39;, alternateClassName: &#39;Ech.ToolTip&#39;, baseCls:&#39;gy-x-tip&#39;, anchorStyle:{ borderColor:&#39;#F1F7FD&#39;, borderLeftColor:&#39;transparent&#39;, borderTopColor:&#39;transparent&#39;, borderBottomColor:&#39;transparent&#39; }, getTargetXY:function(){ var me = this; var ret_parent = this.callParent(arguments); me.anchorEl.setStyle(me.anchorStyle); return ret_parent; } }); 然后把所有带tip的css从ext-all-gray-debug.css里考出来，就改带background-color和border-color的就行了，值为transparent的不用管，我这里用的颜色是background-color: #F1F7FD;border-color: #BACDCE;</description>
+    </item>
+    
+    <item>
+      <title>extjs4.1，能显示纵坐标中心为0点，可显示负数的area图表</title>
+      <link>/blog/ext4-negtive-number-chart/</link>
+      <pubDate>Thu, 21 Feb 2013 17:03:12 +0800</pubDate>
+      
+      <guid>/blog/ext4-negtive-number-chart/</guid>
+      <description>效果：在一个window中，创建一个area chart，纵坐标中心为0点，负值从0点向下显示，正值向上显示，并在chart上创建蒙板，在蒙板上放置随鼠标移动的纵向基线和指示当前数据的框
+效果图： Ext.onReady(function(){ function generate_flow_data(num_count, min_num, max_num){ var numJson = []; for(var i=0;i&amp;lt;(num_count || 100);i++){ numJson[i] = {id:i}; numJson[i][&amp;quot;up&amp;quot;] = get_range_number(min_num||5, max_num||50); numJson[i][&amp;quot;down&amp;quot;] = get_range_number(min_num||5, max_num||50); } function get_range_number(start_num, end_num){ var num = Math.floor(Math.random()*(end_num - start_num) + start_num); return num; } return numJson; } function format_flow_data(numJson, max_num){ var json_len = numJson.length; for(var i=0;i // 下载到0点的需求即：0 == padding+down numJson[i][&amp;quot;padding&amp;quot;]=-((max_num||100)-numJson[i][&amp;quot;down&amp;quot;]); numJson[i][&amp;quot;down&amp;quot;] = -numJson[i][&amp;quot;padding&amp;quot;]; } } var json_test = generate_flow_data(100, 5, 100); format_flow_data(json_test, 100); var jsonData = json_test; var fields = [&#39;id&#39;, &#39;padding&#39;, &#39;down&#39;, &#39;up&#39;]; var browserStore = Ext.</description>
+    </item>
+    
+  </channel>
+</rss>

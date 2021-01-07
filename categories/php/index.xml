@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>php on yufulou&#39;s </title>
+    <link>/categories/php/</link>
+    <description>Recent content in php on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 31 Oct 2018 23:57:52 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/php/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>增加俩php5.2.17的.gdbinit方法</title>
+      <link>/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/</link>
+      <pubDate>Wed, 31 Oct 2018 23:57:52 +0800</pubDate>
+      
+      <guid>/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/</guid>
+      <description>因为经常遇到print_cvs打印失败直接退出的问题，故做了两个方法，打印所有当前的变量名和单个变量，加到现有的.gdbinit就能用
+同时记得老版本的print_zv打印的地址是错的，要把printf后面的参数改成[%p]
+define print_vars ____executor_globals set $p = $eg.current_execute_data.CVs set $c = $eg.current_execute_data.op_array.last_var set $v = $eg.current_execute_data.op_array.vars set $i = 0 printf &amp;#34;Compiled variables count: %d\n&amp;#34;, $c while $i &amp;lt; $c printf &amp;#34;%d = %s [%p] \n&amp;#34;, $i, $v[$i].name, *$p[$i] set $i = $i + 1 end end document print_vars print all var names end define print_var ____executor_globals set $p = $eg.current_execute_data.CVs set $c = $eg.current_execute_data.op_array.last_var set $v = $eg.current_execute_data.op_array.vars set $i = 0 set $varname = $arg0 set $found_var = 0 printf &amp;#34;Compiled variables count: %d\n&amp;#34;, $c printf &amp;#34;to print var name %s\n&amp;#34;, $varname while $i &amp;lt; $c &amp;amp;&amp;amp; 0 == $found_var if strcmp($varname, $v[$i].</description>
+    </item>
+    
+    <item>
+      <title>判断浏览器类型，系统类型的js和php代码</title>
+      <link>/blog/explorer-ua/</link>
+      <pubDate>Tue, 29 Jul 2014 11:39:33 +0800</pubDate>
+      
+      <guid>/blog/explorer-ua/</guid>
+      <description>同一套判断方式的两种写法
+php：
+class BrowserDetector { public $UA = &amp;quot;&amp;quot;; //$HTTP_USER_AGENT的内容 public $BROWSER_VERSION = array(); /* 构造函数开始 */ function __construct(){ $this-&amp;gt;UA = getenv(HTTP_USER_AGENT); $this-&amp;gt;BROWSER_VERSION = array( &amp;quot;trident&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Trident&#39;), //IE内核 &amp;quot;presto&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Presto&#39;), //opera内核 &amp;quot;webKit&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;AppleWebKit&#39;), //苹果、谷歌内核 &amp;quot;gecko&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Gecko&#39;) &amp;amp;&amp;amp; false === stripos($this-&amp;gt;UA, &#39;KHTML&#39;), //火狐内核 &amp;quot;mobile&amp;quot;=&amp;gt; 0 &amp;lt; preg_match(&#39;/AppleWebKit.*Mobile.*/i&#39;, $this-&amp;gt;UA) || 0 &amp;lt; preg_match(&#39;/AppleWebKit/i&#39;, $this-&amp;gt;UA), //是否为移动终端 &amp;quot;ios&amp;quot;=&amp;gt; 0 &amp;lt; preg_match(&#39;/(i[^;]+\;(U;)? CPU.+Mac OS X)/i&#39;, $this-&amp;gt;UA), //ios终端 &amp;quot;android&amp;quot;=&amp;gt; false !</description>
+    </item>
+    
+    <item>
+      <title>26进制(A-Z)与10进制(1-10)的相互转换</title>
+      <link>/blog/dec-26-bidirection/</link>
+      <pubDate>Sat, 15 Mar 2014 09:42:21 +0800</pubDate>
+      
+      <guid>/blog/dec-26-bidirection/</guid>
+      <description>/** * 26进制（A-Z）转10进制int（1-10），服务于excel列数转换 * @param string $colnum * @return number */ public function transXlsColNumToInt($colnum){ $result_int = 0; $column = trim($colnum); if(empty($colnum)) return $result_int; $column_len = strlen($colnum); $bit_curr = pow(26, ($column_len-1)); $start_pos = 0; while($start_pos&amp;lt;=$column_len-1){ $chr = substr($colnum, $start_pos); $result_int += (ord(strtoupper($chr))-64) * $bit_curr; $bit_curr /= 26; $start_pos++; } return $result_int; } /** * 10进制int（1-10）转26进制A-Z，服务于excel列数转换 * @param int $intnum * @return string */ public function transIntToXlsColNum($intnum){ $result_num = &amp;quot;&amp;quot;; if(empty($intnum) || !</description>
+    </item>
+    
+    <item>
+      <title>compile pecl in windows</title>
+      <link>/blog/compile-pecl-in-windows/</link>
+      <pubDate>Thu, 06 Feb 2014 19:15:37 +0800</pubDate>
+      
+      <guid>/blog/compile-pecl-in-windows/</guid>
+      <description>看了N多文章，就没有一个能顺利做下来的……你们真的都试过了吧……
+没在windows下编译过c程序，这回算是长了大经验了，耗时几十小时得有了……
+试验的是pecl_http这个扩展
+遇到的问题：（想到哪说哪，不分先后）
+1、vs2008环境变量的设置，Common7/IDE、VC/bin、Microsoft SDKs\Windows\v7.0\Bin、\win32build\bin需要设置到path
+2、nmake以前需要运行VC/vcvarsall.bat
+3、zlib版本必须大于1.2.5（尝试编译php时），否则会报compress什么的一堆东西未定义，win32build里面好多lib可能都太老了
+4、vs2008导入pecl_http后，好多.h和.c没有被导入到工程(pecl_http1.7.6里面有个工程文件)，导致编译问题
+5、calender.c和jewish.c的编码问题，只能通过editplus的西欧打开，另存为utf8解决（尝试编译php时）
+6、configure.js每次运行都TM报错，还是php官网给的方法，FXXK！这方法有待研究
+7、预处理器ZEND_DEBUG=0，这个一定要设置，否则一定报错
+8、cscript.exe configure.js &amp;ndash;enable-http=shared，nmake以后，没找着http.dll……是官方办法，失败了……
+9、得找个libcurl.lib和openssl那几个lib，拷到win32build/lib里，然后把链接就连接到win32build/lib就行了
+10、编译出来了http.dll，放到ext目录，改php.ini，重启加载，就报错，说在那个目录下面找不到http.dll，肯定还是哪有问题，继续找错……
+11、error C2466: 不能分配常量大小为0 的数组 &amp;mdash; http://sheng.iteye.com/blog/1228239 12、把默认的_DEBUG标识换成NDEBUG，否则编译时会有“error LNK2001: unresolved external symbol __imp___free_dbg”的问题(http://www.jdelist.com/ubb/showflat.php?Cat=&amp;amp;Number=92220&amp;amp;page=0&amp;amp;view=collapsed&amp;amp;sb=5&amp;amp;o=)
+13、一开始链接到一个64位的php的dev的php5ts.lib上，一编译，报了516个错；换成了32位的，瞬间只剩了27个错（不确定是不是真的就是这个原因），最后成功编译也是链接到32位的php5ts.lib上成功的，下次可以试试64位的。（PS：自己编译了一个32位的php，效果和下载的一样）
+14、打开pecl_http的工程文件，里面默认是需要libcurl(带SSL版本)和zlib的头和lib的，都需要下载下来，设置到工程里
+15、一定还有什么别的问题，暂时想不起来了，想起来再补上
+怕是自己64位系统的问题，还特意装了个xp虚拟机，结果貌似也跟这个没关系。。。
+具体步骤等我彻底成功了再贴出来
+PS：耗尽最后一丝耐心，终于根据下面这俩把vld这个扩展编译成功并且加载上了，http还是没搞定，回头再慢慢找原因了。
+这个可能相对靠谱：
+[http://1.lanz.sinaapp.com/?p=124
+](http://1.lanz.sinaapp.com/?p=124)这个有空再试验一下，看起来也稍靠谱：
+[](http://zgqwork.blog.51cto.com/1721633/495958)http://hyshucom.iteye.com/blog/1674498 http://zgqwork.blog.51cto.com/1721633/495958</description>
+    </item>
+    
+    <item>
+      <title>php手册里，pcntl_signal函数解释，很多例子前面declare(ticks=1)这句话的意义</title>
+      <link>/blog/php-pcntl-signal-example/</link>
+      <pubDate>Wed, 09 Oct 2013 23:14:52 +0800</pubDate>
+      
+      <guid>/blog/php-pcntl-signal-example/</guid>
+      <description>找了好多，终于找到这个：http://www.codesky.net/article/201306/181874.html
+最后一段中：
+在此模块做模块初始化时，它会调用： php_add_tick_function(pcntl_signal_dispatch);将pcntl的分发执行函数添加到ticks机制的调用函数中去，从而当ticks触发时就会调用PCNTL扩展函数中指定的所有方法。
+所以每执行完一句话，就会dispatch一下，所以也就是注册了函数的话，就会自动去执行了</description>
+    </item>
+    
+    <item>
+      <title>关于循环fread后push数组，造成内存异常大并越界问题的思考</title>
+      <link>/blog/php-foreach-push/</link>
+      <pubDate>Fri, 01 Feb 2013 20:58:36 +0800</pubDate>
+      
+      <guid>/blog/php-foreach-push/</guid>
+      <description>原问题：
+php版本5.3.6，线程安全版本，debian平台，php的memory_limit是16M event.txt文件只要有行就行，每行最好长一点，比较好重现，比如： 11111111111111111111111111111111111111111111 22222222222222222222222222222222222222222222 脚本：
+$fp = fopen(&amp;quot;event.txt&amp;quot;, &amp;quot;r&amp;quot;); if(!$fp)exit(1); $arr = array(); while(true){ $line = null; $event = null; flush(); gc_collect_cycles(); var_dump(number_format(memory_get_usage(true))); $line = fgets($fp, 4096 * 1024); var_dump(number_format(memory_get_usage())); array_push($arr, $line); if(feof($fp))rewind($fp); } 通过后台命令行执行这个，会发现，memory_get_usage(true)会隔一段时间上升4M左右（没算，目测可能正好就是4M），而memory_get_usage()一直不大，一会就Allowed memory size of 16777216 bytes exhausted了 最终显示： 。。。。 。。。。 。。。。 string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,968,844&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,968,988&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,132&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,276&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,364&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,436&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,580&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,724&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; Fatal error: Allowed memory size of 16777216 bytes exhausted (tried to allocate 4194305 bytes) in /home/eChance/eChance/net_manager.</description>
+    </item>
+    
+    <item>
+      <title>一个通过smtp发送邮件的shell，带用户名密码</title>
+      <link>/blog/smtp-script/</link>
+      <pubDate>Fri, 06 Jan 2012 16:55:14 +0800</pubDate>
+      
+      <guid>/blog/smtp-script/</guid>
+      <description>\#!/bin/bash smail(){ smtp=&amp;quot;mail.mailadd.com 25&amp;quot; # 邮件服务器地址+25端口 smtp_domain=&amp;quot;mailadd.com&amp;quot; # 发送邮件的域名，即@后面的 FROM=&amp;quot;xxx@mailadd.com&amp;quot; # 发送邮件地址 RCPTTO=$1 # 收件人地址 username_base64=&amp;quot;xxxxxxxxxxxxxxxxx&amp;quot; # 用户名base64编码 password_base64=&amp;quot;xxxxxxxx&amp;quot; # 密码base64编码 local_ip=`ifconfig|grep Bcast|awk -F: &#39;{print $2}&#39;|awk -F &amp;quot; &amp;quot; &#39;{print $1}&#39;|head -1` local_name=`uname -n` ( for i in &amp;quot;ehlo $smtp_domain&amp;quot; &amp;quot;AUTH LOGIN&amp;quot; &amp;quot;$username_base64&amp;quot; &amp;quot;$password_base64&amp;quot; &amp;quot;MAIL FROM:&amp;lt;$FROM&amp;gt;&amp;quot; &amp;quot;RCPT TO:&amp;lt;$RCPTTO&amp;gt;&amp;quot; &amp;quot;DATA&amp;quot;;do echo $i sleep 4 done echo &amp;quot;Subject:server alert&amp;quot; echo &amp;quot;From:&amp;lt;$FROM&amp;gt;&amp;quot; echo &amp;quot;To:&amp;lt;$RCPTTO&amp;gt;&amp;quot; echo &amp;quot;server $local_name up, ip:$local_ip&amp;quot; echo &amp;quot;.&amp;quot; sleep 2 echo &amp;quot;quit&amp;quot; )|telnet $smtp } smail xxx@163.</description>
+    </item>
+    
+  </channel>
+</rss>

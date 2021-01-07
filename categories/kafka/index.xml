@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>kafka on yufulou&#39;s </title>
+    <link>/categories/kafka/</link>
+    <description>Recent content in kafka on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 22 Nov 2020 16:05:52 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/kafka/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>【译】【原】kafka rebalance 协议详解</title>
+      <link>/blog/kafka-rebalance-protocol/</link>
+      <pubDate>Sun, 22 Nov 2020 16:05:52 +0800</pubDate>
+      
+      <guid>/blog/kafka-rebalance-protocol/</guid>
+      <description>原文：https://medium.com/streamthoughts/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2
+ 从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。
+这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。
+Kafka &amp;amp; The Rebalance Protocol 101 Let’s go back to some basics Apache Kafka是一个基于分布式、发布/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。
+partitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。
+partition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。
+下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-&amp;gt;C1, P1-&amp;gt;C2, P2-&amp;gt;C3, P3-&amp;gt;C1。
+如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。
+Kafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景
+让我们深挖一下这个协议
+The Rebalance Protocol, in a Nutshell 首先，我们先定义何为Apache Kafka的Rebalance。
+Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https://cwiki.apache.org/confluence/display/KAFKA/Incremental+Cooperative+Rebalancing%3A+Support+and+Policies）
+以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。
+这里是一些Rebalance Protocol的应用：
+  Confluence Schema Registry 依赖rebalancing选主。
+  Kafka Connect 用其在多个worker中分配task和connector。
+  Kafka Stream 用其对多个应用流实例分配task和partition。</description>
+    </item>
+    
+  </channel>
+</rss>

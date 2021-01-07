@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>linux on yufulou&#39;s </title>
+    <link>/categories/linux/</link>
+    <description>Recent content in linux on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 16 Dec 2015 15:30:34 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/linux/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>从同事那边要来的一个两个文件去重的awk脚本</title>
+      <link>/blog/awk-script-dual-file/</link>
+      <pubDate>Wed, 16 Dec 2015 15:30:34 +0800</pubDate>
+      
+      <guid>/blog/awk-script-dual-file/</guid>
+      <description>从同事那边要来的一个两个文件去重的awk脚本，很实用，记录一下，不是比较整行，故用的时候得看看
+#!/bin/bash createSecondFile(){ awk -F&amp;quot;\t&amp;quot; &#39; ARGIND == 1 { a[$3] = 1; next;} ARGIND == 2 { if (a[$2] == 1) { next; } printf(&amp;quot;%s\t%s\n&amp;quot;,$1, $2); } &#39; $1 $2 &amp;gt; $3 } count=$1 for i in `seq 0 ${count}`;do sqlfile=sql_${i}.tmp; updatefile=update_${i}; outfile=sql_${i}.second.tmp; echo &amp;quot;Generate ${outfile}&amp;quot; createSecondFile $updatefile $sqlfile $outfile; done </description>
+    </item>
+    
+    <item>
+      <title>sysctl.conf优化</title>
+      <link>/blog/sysctl-optmization/</link>
+      <pubDate>Thu, 02 Jul 2015 16:31:49 +0800</pubDate>
+      
+      <guid>/blog/sysctl-optmization/</guid>
+      <description>$ cat /etc/sysctl.conf
+# Kernel sysctl configuration file for Red Hat Linux # # For binary values, 0 is disabled, 1 is enabled. See sysctl(8) and # sysctl.conf(5) for more details. # Controls IP packet forwarding net.ipv4.ip_forward = 0 # Controls source route verification net.ipv4.conf.default.rp_filter = 1 # Do not accept source routing net.ipv4.conf.default.accept_source_route = 0 # Controls the System Request debugging functionality of the kernel kernel.sysrq = 0 # Controls whether core dumps will append the PID to the core filename # Useful for debugging multi-threaded applications kernel.</description>
+    </item>
+    
+    <item>
+      <title>NFS文件系统配置，要注意一个小小问题，以及共享session的方法</title>
+      <link>/blog/nfs-config/</link>
+      <pubDate>Mon, 26 Dec 2011 17:11:12 +0800</pubDate>
+      
+      <guid>/blog/nfs-config/</guid>
+      <description>关于NFS
+参考：http://tilt.lib.tsinghua.edu.cn/node/400（
+Linux下NFS(网络文件系统)的建立与配置方法）
+两台机器：
+一台ip：192.168.184.67
+另一台：192.168.184.71（其实无所谓，只要同网段就行…）
+192.168.184.67上设置/etc/exports：
+/home/share_dir 192.168.184.*(rw,sync,no_root_squash)
+其实就是这里需要注意，“*”和“（”之间一定不要有空格然后，
+/etc/init.d/portmap start
+/etc/init.d/nfs start
+另外，还需要查看系统的iptables、/etc/hosts.allow、/etc/hosts.deny是否设置了正确的NFS访问规则。
+再另一台服务器上:
+mount -t nfs 192.168.184.67:/home/share_dir /mnt -o nolock
+然后尝试修改，就会发现已经同步修改了
+如果发现mount不上，比如提示“no route to host”这种提示，则考虑主机可能开了防火墙，编辑iptables，加个例外就可以了
+配置/etc/exports时可用的参数：
+ro：只读访问
+rw：读写访问
+sync：所有数据在请求时写入共享
+async：NFS在写入数据前可以相应请求
+secure：NFS通过1024以下的安全TCP/IP端口发送
+insecure：NFS通过1024以上的端口发送
+wdelay：如果多个用户要写入NFS目录，则归组写入（默认）
+no_wdelay：如果多个用户要写入NFS目录，则立即写入，当使用async时，无需此设置。
+hide：在NFS共享目录中不共享其子目录
+no_hide：共享NFS目录的子目录
+subtree_check：如果共享/usr/bin之类的子目录时，强制NFS检查父目录的权限（默认）
+no_subtree_check：和上面相对，不检查父目录权限
+all_squash：共享文件的UID和GID映射匿名用户anonymous，适合公用目录。
+no_all_squash：保留共享文件的UID和GID（默认）
+root_squash：root用户的所有请求映射成如anonymous用户一样的权限（默认）
+no_root_squash：root用户具有根目录的完全管理访问权限
+anonuid=xxx：指定NFS服务器/etc/passwd文件中匿名用户的UID
+anongid=xxx：指定NFS服务器/etc/passwd文件中匿名用户的GID
+优化：
+转自：http://icarusli.iteye.com/blog/691445（nfs 共享session方式 session_start 慢 问题解决
+）
+1.设置块大小
+mount命令的risize和wsize指定了server端和client端的传输的块大小。
+mount -t nfs -o rsize=8192,wsizevb=8192,timeo=14,intr client:/partition /partition
+如果未指定，系统根据nfs version来设置缺省的risize和wsize大小。大多数情况是4K对于nfs v2，最大是8K，对于v3，通过server端kernel设置risize和wsize的限制
+vi /usr/src/linux2.4.22/include/linux/nfsd/const.h
+修改常量: NFSSVC_MAXBLKSIZE</description>
+    </item>
+    
+    <item>
+      <title>redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）</title>
+      <link>/blog/mysql_drbd/</link>
+      <pubDate>Mon, 26 Dec 2011 15:39:54 +0800</pubDate>
+      
+      <guid>/blog/mysql_drbd/</guid>
+      <description>参考：http://www.boobooke.com/bbs/thread-47791-1-1.html（Heartbeat Drbd Mysql 构建高可用的MYSQL数据库服务）
+redhat1(master):172.31.1.73
+redhat2(slave):172.31.1.71
+VIP:172.31.1.77
+一、准备工作
+1、保证有未格式化的，或者未分区的磁盘空间
+2、修改两机hostname：
+1）两机修改：/etc/hosts文件，加入如下2行（使服务器可通过别名访问）
+172.31.1.71 slave
+172.31.1.73 master
+2）两机修改: /etc/sysconfig/network，把HOSTNAME改为master或者slave
+3）两机执行：hostname master 或者 hostname slave
+4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确
+3、更新源并yum update
+4、安装mysql（我安装的是64位的二进制版），不设置开机启动
+二、安装并配置drbd
+1、两机执行：yum -y install drbd83 kmod-drbd83
+安装后，执行lsmod | grep drbd
+有类似如下显示，则证明安装成功
+drbd 228528 3
+如果发现正常安装无法加载drbd模块，则要通过&amp;quot;uname -a&amp;quot;检查系统是否处于xen内核模式下，如果是，修改/boot/grub/grub.conf，修改默认启动内核为不带&amp;quot;xen&amp;quot;版本的
+2、两机修改：/etc/drbd.conf
+ \# \# please have a a look at the example configuration file in \# /usr/share/doc/drbd83/drbd.conf \# global { usage-count yes; } common { syncer { rate 10M; } } resource r0{ protocol C; startup{ degr-wfc-timeout 120; } disk{ on-io-error detach; } net{ } syncer{ rate 10M; } on master{ device /dev/drbd0; disk /dev/vdb1; // 因情况而异 address 172.</description>
+    </item>
+    
+  </channel>
+</rss>

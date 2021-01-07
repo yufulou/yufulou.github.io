@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Blog on yufulou&#39;s </title>
+    <link>/blog/</link>
+    <description>Recent content in Blog on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 07 Jan 2021 14:20:38 +0800</lastBuildDate>
+    
+	<atom:link href="/blog/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>[转]在MySQL中，如何计算一组数据的中位数？</title>
+      <link>/blog/select-medium-number/</link>
+      <pubDate>Thu, 07 Jan 2021 14:20:38 +0800</pubDate>
+      
+      <guid>/blog/select-medium-number/</guid>
+      <description>原文链接地址：https://learnku.com/articles/18390
+要得到一组数据的中位数（例如某个地区或某家公司的收入中位数），我们一般要将这一任务细分为 3 个小任务：
+ 将数据排序，并给每一行数据给出其在所有数据中的排名； 找出中位数的排名数字； 找出中间排名对应的值；  下面以某公司员工月收入为例，示例 MySQL 的一些复杂语句的使用。
+方法一 创建测试表 首先创建一个收入表，建表语句为：
+CREATE TABLE IF NOT EXISTS `employee` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(10) NOT NULL DEFAULT &#39;&#39;, `income` INT NOT NULL DEFAULT &#39;0&#39; ) ENGINE = InnoDB DEFAULT CHARSET = utf8; INSERT INTO `employee` (`name`, `income`) VALUES (&#39;麻子&#39;, 20000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;李四&#39;, 12000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;张三&#39;, 10000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;王二&#39;, 16000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;土豪&#39;, 40000); 完成任务 1 将数据排序，并给每一行数据给出其在所有数据中的排名：</description>
+    </item>
+    
+    <item>
+      <title>jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</title>
+      <link>/blog/redis-serializer/</link>
+      <pubDate>Mon, 04 Jan 2021 14:14:38 +0800</pubDate>
+      
+      <guid>/blog/redis-serializer/</guid>
+      <description>类似这个帖子提出的问题：https://stackoverflow.com/questions/55278446/redis-caching-mapinteger-string
+即redis中事实上存储的都是字符串，包括key，但又需要反序列化成Map&amp;lt;Integer, String&amp;gt;类似的类型时，虽然能反序列化成功，但发现key的部分实际存储的还是字符串。
+文中提出了如下解决办法：
+但这个办法有个问题，如果是Integer为Key，Value为其他类型还是会有问题。
+故通过Class.getGenericSuperclass重新做了动态版的Serializer（参考：https://blog.csdn.net/xuhailiang0816/article/details/78403041）：
+public class CustomJsonSerializer extends Jackson2JsonRedisSerializer { public CustomJsonSerializer(Class type) { super(type); } @Override protected JavaType getJavaType(Class clazz) { if (List.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &amp;gt; 0) { Class clazzT = (Class)typeList[0]; return TypeFactory.defaultInstance().constructCollectionType(List.class, clazzT); } } else if (Map.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &amp;gt; 1) { Class clazzKey = (Class)typeList[0]; Class clazzVal = (Class)typeList[1]; return TypeFactory.defaultInstance().constructMapType(Map.class, clazzKey, clazzVal); } } // 非map和list类型，返回默认构造器即可  return TypeFactory.</description>
+    </item>
+    
+    <item>
+      <title>【译】【原】kafka rebalance 协议详解</title>
+      <link>/blog/kafka-rebalance-protocol/</link>
+      <pubDate>Sun, 22 Nov 2020 16:05:52 +0800</pubDate>
+      
+      <guid>/blog/kafka-rebalance-protocol/</guid>
+      <description>原文：https://medium.com/streamthoughts/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2
+ 从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。
+这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。
+Kafka &amp;amp; The Rebalance Protocol 101 Let’s go back to some basics Apache Kafka是一个基于分布式、发布/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。
+partitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。
+partition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。
+下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-&amp;gt;C1, P1-&amp;gt;C2, P2-&amp;gt;C3, P3-&amp;gt;C1。
+如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。
+Kafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景
+让我们深挖一下这个协议
+The Rebalance Protocol, in a Nutshell 首先，我们先定义何为Apache Kafka的Rebalance。
+Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https://cwiki.apache.org/confluence/display/KAFKA/Incremental+Cooperative+Rebalancing%3A+Support+and+Policies）
+以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。
+这里是一些Rebalance Protocol的应用：
+  Confluence Schema Registry 依赖rebalancing选主。
+  Kafka Connect 用其在多个worker中分配task和connector。
+  Kafka Stream 用其对多个应用流实例分配task和partition。</description>
+    </item>
+    
+    <item>
+      <title>增加俩php5.2.17的.gdbinit方法</title>
+      <link>/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/</link>
+      <pubDate>Wed, 31 Oct 2018 23:57:52 +0800</pubDate>
+      
+      <guid>/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/</guid>
+      <description>因为经常遇到print_cvs打印失败直接退出的问题，故做了两个方法，打印所有当前的变量名和单个变量，加到现有的.gdbinit就能用
+同时记得老版本的print_zv打印的地址是错的，要把printf后面的参数改成[%p]
+define print_vars ____executor_globals set $p = $eg.current_execute_data.CVs set $c = $eg.current_execute_data.op_array.last_var set $v = $eg.current_execute_data.op_array.vars set $i = 0 printf &amp;#34;Compiled variables count: %d\n&amp;#34;, $c while $i &amp;lt; $c printf &amp;#34;%d = %s [%p] \n&amp;#34;, $i, $v[$i].name, *$p[$i] set $i = $i + 1 end end document print_vars print all var names end define print_var ____executor_globals set $p = $eg.current_execute_data.CVs set $c = $eg.current_execute_data.op_array.last_var set $v = $eg.current_execute_data.op_array.vars set $i = 0 set $varname = $arg0 set $found_var = 0 printf &amp;#34;Compiled variables count: %d\n&amp;#34;, $c printf &amp;#34;to print var name %s\n&amp;#34;, $varname while $i &amp;lt; $c &amp;amp;&amp;amp; 0 == $found_var if strcmp($varname, $v[$i].</description>
+    </item>
+    
+    <item>
+      <title>redis可能波动的几种情况</title>
+      <link>/blog/redis-fluctruate/</link>
+      <pubDate>Sat, 29 Sep 2018 17:25:07 +0800</pubDate>
+      
+      <guid>/blog/redis-fluctruate/</guid>
+      <description>内存占用太大时，bgsave的fork复制内存
+aof文件fsync时间过长
+内存碎片太多，导致重新布局
+不常用的value入swap，导致读取变慢</description>
+    </item>
+    
+    <item>
+      <title>从同事那边要来的一个两个文件去重的awk脚本</title>
+      <link>/blog/awk-script-dual-file/</link>
+      <pubDate>Wed, 16 Dec 2015 15:30:34 +0800</pubDate>
+      
+      <guid>/blog/awk-script-dual-file/</guid>
+      <description>从同事那边要来的一个两个文件去重的awk脚本，很实用，记录一下，不是比较整行，故用的时候得看看
+#!/bin/bash createSecondFile(){ awk -F&amp;quot;\t&amp;quot; &#39; ARGIND == 1 { a[$3] = 1; next;} ARGIND == 2 { if (a[$2] == 1) { next; } printf(&amp;quot;%s\t%s\n&amp;quot;,$1, $2); } &#39; $1 $2 &amp;gt; $3 } count=$1 for i in `seq 0 ${count}`;do sqlfile=sql_${i}.tmp; updatefile=update_${i}; outfile=sql_${i}.second.tmp; echo &amp;quot;Generate ${outfile}&amp;quot; createSecondFile $updatefile $sqlfile $outfile; done </description>
+    </item>
+    
+    <item>
+      <title>sysctl.conf优化</title>
+      <link>/blog/sysctl-optmization/</link>
+      <pubDate>Thu, 02 Jul 2015 16:31:49 +0800</pubDate>
+      
+      <guid>/blog/sysctl-optmization/</guid>
+      <description>$ cat /etc/sysctl.conf
+# Kernel sysctl configuration file for Red Hat Linux # # For binary values, 0 is disabled, 1 is enabled. See sysctl(8) and # sysctl.conf(5) for more details. # Controls IP packet forwarding net.ipv4.ip_forward = 0 # Controls source route verification net.ipv4.conf.default.rp_filter = 1 # Do not accept source routing net.ipv4.conf.default.accept_source_route = 0 # Controls the System Request debugging functionality of the kernel kernel.sysrq = 0 # Controls whether core dumps will append the PID to the core filename # Useful for debugging multi-threaded applications kernel.</description>
+    </item>
+    
+    <item>
+      <title>mongodb本地表移库</title>
+      <link>/blog/mongo-move-data/</link>
+      <pubDate>Thu, 21 Aug 2014 20:13:01 +0800</pubDate>
+      
+      <guid>/blog/mongo-move-data/</guid>
+      <description>在网上找这种本地移表的方法，一直没找着，自己写了个凑合用,有时候好不容易写几行基础数据不容易啊，尤其mongodb。。。每次还得带着字段名。。。回头万一设计时候出错了也比较好改~~ 下面这种办法会报错：
+db.runCommand({cloneCollection:&amp;quot;db1.table_to_move&amp;quot;, from:&amp;quot;127.0.0.1:27017&amp;quot;}); { &amp;quot;errmsg&amp;quot; : &amp;quot;can&#39;t cloneCollection from self&amp;quot;, &amp;quot;ok&amp;quot; : 0 } use db1; var cursor = db.table_to_move.find(); use db2; while(cursor.hasNext()){ db2.table_to_move.insert(cursor.next()); } </description>
+    </item>
+    
+    <item>
+      <title>VMware装mac虚拟机时候需要注意的</title>
+      <link>/blog/mac-system-in-vm/</link>
+      <pubDate>Tue, 19 Aug 2014 11:29:08 +0800</pubDate>
+      
+      <guid>/blog/mac-system-in-vm/</guid>
+      <description>1、要是开机出磁盘。。。unsuccessful什么的，打开vmx文件，删了efi那一行（换个iso后来就没这事了） 2、要是就卡在读磁盘读不出来那块了，有两种可能。a、iso有问题，b、做虚拟机时候，需要磁盘文件是一个文件，不能分到多个文件（可能需要打开显示器的3D加速） 3、装好以后，把cd启动盘换成darwin.iso</description>
+    </item>
+    
+    <item>
+      <title>判断浏览器类型，系统类型的js和php代码</title>
+      <link>/blog/explorer-ua/</link>
+      <pubDate>Tue, 29 Jul 2014 11:39:33 +0800</pubDate>
+      
+      <guid>/blog/explorer-ua/</guid>
+      <description>同一套判断方式的两种写法
+php：
+class BrowserDetector { public $UA = &amp;quot;&amp;quot;; //$HTTP_USER_AGENT的内容 public $BROWSER_VERSION = array(); /* 构造函数开始 */ function __construct(){ $this-&amp;gt;UA = getenv(HTTP_USER_AGENT); $this-&amp;gt;BROWSER_VERSION = array( &amp;quot;trident&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Trident&#39;), //IE内核 &amp;quot;presto&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Presto&#39;), //opera内核 &amp;quot;webKit&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;AppleWebKit&#39;), //苹果、谷歌内核 &amp;quot;gecko&amp;quot;=&amp;gt; false !== stripos($this-&amp;gt;UA, &#39;Gecko&#39;) &amp;amp;&amp;amp; false === stripos($this-&amp;gt;UA, &#39;KHTML&#39;), //火狐内核 &amp;quot;mobile&amp;quot;=&amp;gt; 0 &amp;lt; preg_match(&#39;/AppleWebKit.*Mobile.*/i&#39;, $this-&amp;gt;UA) || 0 &amp;lt; preg_match(&#39;/AppleWebKit/i&#39;, $this-&amp;gt;UA), //是否为移动终端 &amp;quot;ios&amp;quot;=&amp;gt; 0 &amp;lt; preg_match(&#39;/(i[^;]+\;(U;)? CPU.+Mac OS X)/i&#39;, $this-&amp;gt;UA), //ios终端 &amp;quot;android&amp;quot;=&amp;gt; false !</description>
+    </item>
+    
+    <item>
+      <title>26进制(A-Z)与10进制(1-10)的相互转换</title>
+      <link>/blog/dec-26-bidirection/</link>
+      <pubDate>Sat, 15 Mar 2014 09:42:21 +0800</pubDate>
+      
+      <guid>/blog/dec-26-bidirection/</guid>
+      <description>/** * 26进制（A-Z）转10进制int（1-10），服务于excel列数转换 * @param string $colnum * @return number */ public function transXlsColNumToInt($colnum){ $result_int = 0; $column = trim($colnum); if(empty($colnum)) return $result_int; $column_len = strlen($colnum); $bit_curr = pow(26, ($column_len-1)); $start_pos = 0; while($start_pos&amp;lt;=$column_len-1){ $chr = substr($colnum, $start_pos); $result_int += (ord(strtoupper($chr))-64) * $bit_curr; $bit_curr /= 26; $start_pos++; } return $result_int; } /** * 10进制int（1-10）转26进制A-Z，服务于excel列数转换 * @param int $intnum * @return string */ public function transIntToXlsColNum($intnum){ $result_num = &amp;quot;&amp;quot;; if(empty($intnum) || !</description>
+    </item>
+    
+    <item>
+      <title>compile pecl in windows</title>
+      <link>/blog/compile-pecl-in-windows/</link>
+      <pubDate>Thu, 06 Feb 2014 19:15:37 +0800</pubDate>
+      
+      <guid>/blog/compile-pecl-in-windows/</guid>
+      <description>看了N多文章，就没有一个能顺利做下来的……你们真的都试过了吧……
+没在windows下编译过c程序，这回算是长了大经验了，耗时几十小时得有了……
+试验的是pecl_http这个扩展
+遇到的问题：（想到哪说哪，不分先后）
+1、vs2008环境变量的设置，Common7/IDE、VC/bin、Microsoft SDKs\Windows\v7.0\Bin、\win32build\bin需要设置到path
+2、nmake以前需要运行VC/vcvarsall.bat
+3、zlib版本必须大于1.2.5（尝试编译php时），否则会报compress什么的一堆东西未定义，win32build里面好多lib可能都太老了
+4、vs2008导入pecl_http后，好多.h和.c没有被导入到工程(pecl_http1.7.6里面有个工程文件)，导致编译问题
+5、calender.c和jewish.c的编码问题，只能通过editplus的西欧打开，另存为utf8解决（尝试编译php时）
+6、configure.js每次运行都TM报错，还是php官网给的方法，FXXK！这方法有待研究
+7、预处理器ZEND_DEBUG=0，这个一定要设置，否则一定报错
+8、cscript.exe configure.js &amp;ndash;enable-http=shared，nmake以后，没找着http.dll……是官方办法，失败了……
+9、得找个libcurl.lib和openssl那几个lib，拷到win32build/lib里，然后把链接就连接到win32build/lib就行了
+10、编译出来了http.dll，放到ext目录，改php.ini，重启加载，就报错，说在那个目录下面找不到http.dll，肯定还是哪有问题，继续找错……
+11、error C2466: 不能分配常量大小为0 的数组 &amp;mdash; http://sheng.iteye.com/blog/1228239 12、把默认的_DEBUG标识换成NDEBUG，否则编译时会有“error LNK2001: unresolved external symbol __imp___free_dbg”的问题(http://www.jdelist.com/ubb/showflat.php?Cat=&amp;amp;Number=92220&amp;amp;page=0&amp;amp;view=collapsed&amp;amp;sb=5&amp;amp;o=)
+13、一开始链接到一个64位的php的dev的php5ts.lib上，一编译，报了516个错；换成了32位的，瞬间只剩了27个错（不确定是不是真的就是这个原因），最后成功编译也是链接到32位的php5ts.lib上成功的，下次可以试试64位的。（PS：自己编译了一个32位的php，效果和下载的一样）
+14、打开pecl_http的工程文件，里面默认是需要libcurl(带SSL版本)和zlib的头和lib的，都需要下载下来，设置到工程里
+15、一定还有什么别的问题，暂时想不起来了，想起来再补上
+怕是自己64位系统的问题，还特意装了个xp虚拟机，结果貌似也跟这个没关系。。。
+具体步骤等我彻底成功了再贴出来
+PS：耗尽最后一丝耐心，终于根据下面这俩把vld这个扩展编译成功并且加载上了，http还是没搞定，回头再慢慢找原因了。
+这个可能相对靠谱：
+[http://1.lanz.sinaapp.com/?p=124
+](http://1.lanz.sinaapp.com/?p=124)这个有空再试验一下，看起来也稍靠谱：
+[](http://zgqwork.blog.51cto.com/1721633/495958)http://hyshucom.iteye.com/blog/1674498 http://zgqwork.blog.51cto.com/1721633/495958</description>
+    </item>
+    
+    <item>
+      <title>php手册里，pcntl_signal函数解释，很多例子前面declare(ticks=1)这句话的意义</title>
+      <link>/blog/php-pcntl-signal-example/</link>
+      <pubDate>Wed, 09 Oct 2013 23:14:52 +0800</pubDate>
+      
+      <guid>/blog/php-pcntl-signal-example/</guid>
+      <description>找了好多，终于找到这个：http://www.codesky.net/article/201306/181874.html
+最后一段中：
+在此模块做模块初始化时，它会调用： php_add_tick_function(pcntl_signal_dispatch);将pcntl的分发执行函数添加到ticks机制的调用函数中去，从而当ticks触发时就会调用PCNTL扩展函数中指定的所有方法。
+所以每执行完一句话，就会dispatch一下，所以也就是注册了函数的话，就会自动去执行了</description>
+    </item>
+    
+    <item>
+      <title>随想随写的mysql性能优化流水账</title>
+      <link>/blog/mysql-optimization-draft/</link>
+      <pubDate>Wed, 09 Oct 2013 17:48:04 +0800</pubDate>
+      
+      <guid>/blog/mysql-optimization-draft/</guid>
+      <description>总结mysql优化方式：
+1、 语句方面工具：
+a) Explain
+b) Set profiling=1
+2、 语句方面的注意事项：
+a) 降低每次查找的数据量，避免出现需要使用tmp file的情况
+b) 把in尽量写成exists，not in =&amp;gt; not exists
+c) 需要Like的场景尽量使用左匹配
+d) 如果可以把两次查找放到同一个sql中，并不增加语句复杂度，尽量这样做，对速度有帮助
+e) 可以在一定情况下，使用force/ignore/use index语句指定查询索引，提高速度
+f) 尽量not null
+g) 在字符串长度变化不大的场景下，用char替换varchar可提高查找速度
+h) 复杂的查询使用procedure，减少进程间交互
+i) 使用HIGH_PRIORITY提高需要尽快返回结果的查询的优先级
+j) 使用SQL_CALC_FOUND_ROWS进行分页的总数统计，少用一次count，对innodb查询作用比较大
+3、 提高innodb_buffer_pool_size，对innodb的插入查找速度都有帮助(innodb_log_file_size=innodb_buffer_pool_size/redo日志)
+4、 提高key_buffer_size可对myisam查询很有帮助
+5、 加入skip-name-resolve，避免mysql的dns反查
+6、 活用几种cache/buffer(sort_buffer_size:排序缓存，存储order by的中间结果，超过这个值则会使用tmp file；read_buffer_size:循序查找缓存；read_rnd_buffer_size:随机查找缓存；query_cache:语句缓存，增大可加快对更新不快的数据表的查询；join_buffer_size:联合查找的中间缓存) – 并不是越大越好，需要有个合适的值
+7、 Myisam使用concurrent_insert=2，在队尾插入，定期空闲时间optimize table，可保证查询速度的同时，不使表增大太快
+8、 使用slow_query_log记录慢查询，并进行优化
+9、 可定期analyze table，使mysql优化选择器选择更合适的方案
+10、 开启二进制日志(可用mixed方式)，可辅助redo日志进行数据库崩溃时的修复。（可定期检查并删除过期日志避免磁盘空间增大，如果场景数据增量比较稳定，用expire_logs_days即可）
+11、 分表，分区，垂直分割数据表（基本信息表、附加信息表）
+12、 通过replication做主从负载均衡
+13、 通过drbd+heartbeat做高可用</description>
+    </item>
+    
+    <item>
+      <title>改变extjs4.1中tooltip的整体颜色</title>
+      <link>/blog/ext4-tooltip-color/</link>
+      <pubDate>Mon, 04 Mar 2013 20:40:34 +0800</pubDate>
+      
+      <guid>/blog/ext4-tooltip-color/</guid>
+      <description>1、尝试过用cls，style，都是在火狐，chrome，ie9上没问题，在ie8以下就有问题
+2、尝试过bodyStyle，能行，但是你会发现有个令人讨厌的蓝边（原始样式）
+然后在sencha论坛里发现有个哥们跟我遇到同样问题，是通过改baseCls解决的，确实好用，也不麻烦，贴出来大家共用，原帖地址（倒数第二个回帖）：http://www.sencha.com/forum/showthread.php?40155-Chang-background-color-in-a-tooltip
+但我的做法比他多一步，就是我重写了Ext.tip.ToolTip因为我用了gray这个theme，所以前面那个anchor是个灰色的，和我整体颜色不搭：
+Ext.define(&#39;Ech.ux.ToolTip&#39;, { extend: &#39;Ext.tip.ToolTip&#39;, alias: &#39;ech.tooltip&#39;, alternateClassName: &#39;Ech.ToolTip&#39;, baseCls:&#39;gy-x-tip&#39;, anchorStyle:{ borderColor:&#39;#F1F7FD&#39;, borderLeftColor:&#39;transparent&#39;, borderTopColor:&#39;transparent&#39;, borderBottomColor:&#39;transparent&#39; }, getTargetXY:function(){ var me = this; var ret_parent = this.callParent(arguments); me.anchorEl.setStyle(me.anchorStyle); return ret_parent; } }); 然后把所有带tip的css从ext-all-gray-debug.css里考出来，就改带background-color和border-color的就行了，值为transparent的不用管，我这里用的颜色是background-color: #F1F7FD;border-color: #BACDCE;</description>
+    </item>
+    
+    <item>
+      <title>extjs4.1，能显示纵坐标中心为0点，可显示负数的area图表</title>
+      <link>/blog/ext4-negtive-number-chart/</link>
+      <pubDate>Thu, 21 Feb 2013 17:03:12 +0800</pubDate>
+      
+      <guid>/blog/ext4-negtive-number-chart/</guid>
+      <description>效果：在一个window中，创建一个area chart，纵坐标中心为0点，负值从0点向下显示，正值向上显示，并在chart上创建蒙板，在蒙板上放置随鼠标移动的纵向基线和指示当前数据的框
+效果图： Ext.onReady(function(){ function generate_flow_data(num_count, min_num, max_num){ var numJson = []; for(var i=0;i&amp;lt;(num_count || 100);i++){ numJson[i] = {id:i}; numJson[i][&amp;quot;up&amp;quot;] = get_range_number(min_num||5, max_num||50); numJson[i][&amp;quot;down&amp;quot;] = get_range_number(min_num||5, max_num||50); } function get_range_number(start_num, end_num){ var num = Math.floor(Math.random()*(end_num - start_num) + start_num); return num; } return numJson; } function format_flow_data(numJson, max_num){ var json_len = numJson.length; for(var i=0;i // 下载到0点的需求即：0 == padding+down numJson[i][&amp;quot;padding&amp;quot;]=-((max_num||100)-numJson[i][&amp;quot;down&amp;quot;]); numJson[i][&amp;quot;down&amp;quot;] = -numJson[i][&amp;quot;padding&amp;quot;]; } } var json_test = generate_flow_data(100, 5, 100); format_flow_data(json_test, 100); var jsonData = json_test; var fields = [&#39;id&#39;, &#39;padding&#39;, &#39;down&#39;, &#39;up&#39;]; var browserStore = Ext.</description>
+    </item>
+    
+    <item>
+      <title>关于循环fread后push数组，造成内存异常大并越界问题的思考</title>
+      <link>/blog/php-foreach-push/</link>
+      <pubDate>Fri, 01 Feb 2013 20:58:36 +0800</pubDate>
+      
+      <guid>/blog/php-foreach-push/</guid>
+      <description>原问题：
+php版本5.3.6，线程安全版本，debian平台，php的memory_limit是16M event.txt文件只要有行就行，每行最好长一点，比较好重现，比如： 11111111111111111111111111111111111111111111 22222222222222222222222222222222222222222222 脚本：
+$fp = fopen(&amp;quot;event.txt&amp;quot;, &amp;quot;r&amp;quot;); if(!$fp)exit(1); $arr = array(); while(true){ $line = null; $event = null; flush(); gc_collect_cycles(); var_dump(number_format(memory_get_usage(true))); $line = fgets($fp, 4096 * 1024); var_dump(number_format(memory_get_usage())); array_push($arr, $line); if(feof($fp))rewind($fp); } 通过后台命令行执行这个，会发现，memory_get_usage(true)会隔一段时间上升4M左右（没算，目测可能正好就是4M），而memory_get_usage()一直不大，一会就Allowed memory size of 16777216 bytes exhausted了 最终显示： 。。。。 。。。。 。。。。 string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,968,844&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,968,988&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,132&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,276&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,364&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,436&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,580&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; string(9) &amp;ldquo;1,969,724&amp;rdquo; string(10) &amp;ldquo;13,893,632&amp;rdquo; Fatal error: Allowed memory size of 16777216 bytes exhausted (tried to allocate 4194305 bytes) in /home/eChance/eChance/net_manager.</description>
+    </item>
+    
+    <item>
+      <title>mysql5.1.58 触发器中调用存储过程 出现“Table was not locked with LOCK TABLES”的解决办法</title>
+      <link>/blog/mysql-trigger-error/</link>
+      <pubDate>Wed, 29 Aug 2012 19:02:20 +0800</pubDate>
+      
+      <guid>/blog/mysql-trigger-error/</guid>
+      <description>第一次遇到这个问题，网上也没查到相关办法，特发博客记录一手
+先定义2个临时叫法：
+1级存储过程：触发器中直接调用的存储过程
+N+1级存储过程：1级存储过程调用的子存储过程，以及子存储过程调用的存储过程。。。。。
+先大概说一下：
+1、官方文档表示：如果运行了lock table，则以后对任何表进行操作前，都必须lock table，否则，就提示本文标题那个错误。
+2、有个特殊情况，就是，在被lock表的触发器中，如果写了对另外一个实体表的操作，则另外那个实体表自动被加相同的锁。该原则，适用于1级及N+1级所有存储过程，所有在操作涉及到的实体表都会自动被加相同的锁，所以都不会出错。
+3、但，如果被lock表的触发器的1级存储过程创建了一个临时表，则该临时表只能在本存储过程内被操作，N+1级存储过程想对其进行操作，则会提示：Table &amp;lsquo;xxxxx&amp;rsquo; was not locked with LOCK TABLES。
+4、存储过程中不能使用lock table语句
+然后，我就发现了一个有意思的办法，就是“声明”
+只要在N+1级存储过程中，这样声明一下1级存储过程创建的临时表名，就可以安全过关了：create temporary table if not exists xxxxx(col1 int);
+此时列名、类型都不需要一样
+今天时间不够了，下次试验一下prepare statement会不会有类似问题，但估计得有
+实例
+建表：
+触发器：
+1级存储过程直接操作：
+1级存储过程操作成功：
+N+1级存储过程不声明：
+N+1级存储过程调用失败：
+N+1级存储过程声明临时表（此时，声明不需要列名，列数，以及类型匹配）：
+N+1级存储过程调用成功（可以看到，此时，不严格的声明，不会对临时表结果造成影响）：</description>
+    </item>
+    
+    <item>
+      <title>在procedure中代替return的方法</title>
+      <link>/blog/replace-return-in-procedure/</link>
+      <pubDate>Wed, 23 May 2012 15:56:19 +0800</pubDate>
+      
+      <guid>/blog/replace-return-in-procedure/</guid>
+      <description>DELIMITER // DROP PROCEDURE IF EXISTS proc_test_leave; CREATE PROCEDURE proc_test_leave() begin declare ab varchar(10); label_leave:begin SET ab=&amp;quot;1&amp;quot;; if 1 then set ab=&amp;quot;2&amp;quot;; if 1 then SET ab=&amp;quot;3&amp;quot;; leave label_leave; end if; else leave label_leave; end if; end label_leave; select ab; END; // DELIMITER ; </description>
+    </item>
+    
+    <item>
+      <title>mysql utf8 中文字符 排序</title>
+      <link>/blog/mysql-sort-chinese/</link>
+      <pubDate>Sat, 04 Feb 2012 22:05:27 +0800</pubDate>
+      
+      <guid>/blog/mysql-sort-chinese/</guid>
+      <description>最原始的帖子我打开不开，就贴这个地址吧： http://adriano.blogbus.com/logs/14278134.html
+跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？
+乘着放假，帮老大做个系统以减轻他的工作强度。
+用什么做，当然是ruby on rails+mysql啦。
+又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。
+当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。
+这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。
+然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！
+解决的过程大致有四个阶段：
+一、首先当然是google和baidu,下面是被转载最多的文章，基本上用&amp;quot;mysql 中文排序&amp;quot;搜索，前n页都是对此的转载。提供了2种方法
+方法1，一种解决方法是对于包含中文的字段加上&amp;quot;binary&amp;quot;属性，使之作为二进制比较，例如将&amp;quot;name char(10)&amp;ldquo;改成&amp;quot;name char(10)binary&amp;rdquo;。方法2 ，如果你使用源码编译MySQL，可以编译MySQL时使用&amp;ndash;with&amp;ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。
+二、后来查到这个网页，使我有点绝望
+http://www.5ivb.com/Info/68/3390242/
+我研究了一下，初步了解：用二进制 binary 排序的前提是把 gbk/gb2312 的汉字编码以 utf-8 的格式存进去，所以一个汉字被保存成 4 个字节，而不是真正的 3 个字节。如果数据库中真的以 utf-8 的字符集保存，则二进制 binary 排序会得出错误结果（非拼音排序）。另外，以 utf-8 保存 gbk/gb2312 的编码会带来 char_length() 错误的问题。基本有结果了，看了 mysql 的文档后，明白了直接的排序办法没有！ 让我们期待 utf8_chinese_ci 的发布。 在这之前只能考虑间接的办法了。三、于是开始决定放弃utf8，修改为gbk或者gb2312
+查看了若干网页，试验若干次，终于发现一下几点：
+1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)
+2、要将我做好的系统整个改成gb2312，需要做以下的事情：
+a.将所有的ruby文件改回ansi。
+b.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。
+c.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml
+adapter: mysql
+database:
+username: root
+password:
+host:
+encoding: gb2312</description>
+    </item>
+    
+    <item>
+      <title>一个通过smtp发送邮件的shell，带用户名密码</title>
+      <link>/blog/smtp-script/</link>
+      <pubDate>Fri, 06 Jan 2012 16:55:14 +0800</pubDate>
+      
+      <guid>/blog/smtp-script/</guid>
+      <description>\#!/bin/bash smail(){ smtp=&amp;quot;mail.mailadd.com 25&amp;quot; # 邮件服务器地址+25端口 smtp_domain=&amp;quot;mailadd.com&amp;quot; # 发送邮件的域名，即@后面的 FROM=&amp;quot;xxx@mailadd.com&amp;quot; # 发送邮件地址 RCPTTO=$1 # 收件人地址 username_base64=&amp;quot;xxxxxxxxxxxxxxxxx&amp;quot; # 用户名base64编码 password_base64=&amp;quot;xxxxxxxx&amp;quot; # 密码base64编码 local_ip=`ifconfig|grep Bcast|awk -F: &#39;{print $2}&#39;|awk -F &amp;quot; &amp;quot; &#39;{print $1}&#39;|head -1` local_name=`uname -n` ( for i in &amp;quot;ehlo $smtp_domain&amp;quot; &amp;quot;AUTH LOGIN&amp;quot; &amp;quot;$username_base64&amp;quot; &amp;quot;$password_base64&amp;quot; &amp;quot;MAIL FROM:&amp;lt;$FROM&amp;gt;&amp;quot; &amp;quot;RCPT TO:&amp;lt;$RCPTTO&amp;gt;&amp;quot; &amp;quot;DATA&amp;quot;;do echo $i sleep 4 done echo &amp;quot;Subject:server alert&amp;quot; echo &amp;quot;From:&amp;lt;$FROM&amp;gt;&amp;quot; echo &amp;quot;To:&amp;lt;$RCPTTO&amp;gt;&amp;quot; echo &amp;quot;server $local_name up, ip:$local_ip&amp;quot; echo &amp;quot;.&amp;quot; sleep 2 echo &amp;quot;quit&amp;quot; )|telnet $smtp } smail xxx@163.</description>
+    </item>
+    
+    <item>
+      <title>NFS文件系统配置，要注意一个小小问题，以及共享session的方法</title>
+      <link>/blog/nfs-config/</link>
+      <pubDate>Mon, 26 Dec 2011 17:11:12 +0800</pubDate>
+      
+      <guid>/blog/nfs-config/</guid>
+      <description>关于NFS
+参考：http://tilt.lib.tsinghua.edu.cn/node/400（
+Linux下NFS(网络文件系统)的建立与配置方法）
+两台机器：
+一台ip：192.168.184.67
+另一台：192.168.184.71（其实无所谓，只要同网段就行…）
+192.168.184.67上设置/etc/exports：
+/home/share_dir 192.168.184.*(rw,sync,no_root_squash)
+其实就是这里需要注意，“*”和“（”之间一定不要有空格然后，
+/etc/init.d/portmap start
+/etc/init.d/nfs start
+另外，还需要查看系统的iptables、/etc/hosts.allow、/etc/hosts.deny是否设置了正确的NFS访问规则。
+再另一台服务器上:
+mount -t nfs 192.168.184.67:/home/share_dir /mnt -o nolock
+然后尝试修改，就会发现已经同步修改了
+如果发现mount不上，比如提示“no route to host”这种提示，则考虑主机可能开了防火墙，编辑iptables，加个例外就可以了
+配置/etc/exports时可用的参数：
+ro：只读访问
+rw：读写访问
+sync：所有数据在请求时写入共享
+async：NFS在写入数据前可以相应请求
+secure：NFS通过1024以下的安全TCP/IP端口发送
+insecure：NFS通过1024以上的端口发送
+wdelay：如果多个用户要写入NFS目录，则归组写入（默认）
+no_wdelay：如果多个用户要写入NFS目录，则立即写入，当使用async时，无需此设置。
+hide：在NFS共享目录中不共享其子目录
+no_hide：共享NFS目录的子目录
+subtree_check：如果共享/usr/bin之类的子目录时，强制NFS检查父目录的权限（默认）
+no_subtree_check：和上面相对，不检查父目录权限
+all_squash：共享文件的UID和GID映射匿名用户anonymous，适合公用目录。
+no_all_squash：保留共享文件的UID和GID（默认）
+root_squash：root用户的所有请求映射成如anonymous用户一样的权限（默认）
+no_root_squash：root用户具有根目录的完全管理访问权限
+anonuid=xxx：指定NFS服务器/etc/passwd文件中匿名用户的UID
+anongid=xxx：指定NFS服务器/etc/passwd文件中匿名用户的GID
+优化：
+转自：http://icarusli.iteye.com/blog/691445（nfs 共享session方式 session_start 慢 问题解决
+）
+1.设置块大小
+mount命令的risize和wsize指定了server端和client端的传输的块大小。
+mount -t nfs -o rsize=8192,wsizevb=8192,timeo=14,intr client:/partition /partition
+如果未指定，系统根据nfs version来设置缺省的risize和wsize大小。大多数情况是4K对于nfs v2，最大是8K，对于v3，通过server端kernel设置risize和wsize的限制
+vi /usr/src/linux2.4.22/include/linux/nfsd/const.h
+修改常量: NFSSVC_MAXBLKSIZE</description>
+    </item>
+    
+    <item>
+      <title>redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）</title>
+      <link>/blog/mysql_drbd/</link>
+      <pubDate>Mon, 26 Dec 2011 15:39:54 +0800</pubDate>
+      
+      <guid>/blog/mysql_drbd/</guid>
+      <description>参考：http://www.boobooke.com/bbs/thread-47791-1-1.html（Heartbeat Drbd Mysql 构建高可用的MYSQL数据库服务）
+redhat1(master):172.31.1.73
+redhat2(slave):172.31.1.71
+VIP:172.31.1.77
+一、准备工作
+1、保证有未格式化的，或者未分区的磁盘空间
+2、修改两机hostname：
+1）两机修改：/etc/hosts文件，加入如下2行（使服务器可通过别名访问）
+172.31.1.71 slave
+172.31.1.73 master
+2）两机修改: /etc/sysconfig/network，把HOSTNAME改为master或者slave
+3）两机执行：hostname master 或者 hostname slave
+4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确
+3、更新源并yum update
+4、安装mysql（我安装的是64位的二进制版），不设置开机启动
+二、安装并配置drbd
+1、两机执行：yum -y install drbd83 kmod-drbd83
+安装后，执行lsmod | grep drbd
+有类似如下显示，则证明安装成功
+drbd 228528 3
+如果发现正常安装无法加载drbd模块，则要通过&amp;quot;uname -a&amp;quot;检查系统是否处于xen内核模式下，如果是，修改/boot/grub/grub.conf，修改默认启动内核为不带&amp;quot;xen&amp;quot;版本的
+2、两机修改：/etc/drbd.conf
+ \# \# please have a a look at the example configuration file in \# /usr/share/doc/drbd83/drbd.conf \# global { usage-count yes; } common { syncer { rate 10M; } } resource r0{ protocol C; startup{ degr-wfc-timeout 120; } disk{ on-io-error detach; } net{ } syncer{ rate 10M; } on master{ device /dev/drbd0; disk /dev/vdb1; // 因情况而异 address 172.</description>
+    </item>
+    
+    <item>
+      <title>【原】vmware上4台centos5.7.i386做2*LVS/DR(master backup) 2*realserver</title>
+      <link>/blog/lvson4vm/</link>
+      <pubDate>Fri, 23 Dec 2011 17:57:21 +0800</pubDate>
+      
+      <guid>/blog/lvson4vm/</guid>
+      <description>参考的是这篇文档：http://www.360doc.com/content/11/0301/10/834950_97080013.shtml
+但该文档有些错误，所以自己又按自己的流程整理了下，整体没啥变化，所以应该能用到实际生产中（虽然具体，但只进行了初步测试，应该会有一些问题，只是为以后自己用时，做个记录）：
+前提操作：
+1、设置源（我这个默认那个源就很给力，所以没设置）
+2、yum update
+3、yum安装kernel-headers,kernel-devel
+4、yum安装httpd、php、mysql等服务（php、mysql为测试用）
+5、yum安装gcc，g ，openssl-devel
+6、vi /etc/sysctl.conf 修改net.ipv4.ip_forward=1
+7、编辑/etc/inittab，
+把“id:5:initdefault:”改成“id:3:initdefault:”，
+关了图形界面，开关机快些、占用资源少些
+8、然后，关掉虚拟机（先关机，然后从标签页中，按X，彻底关掉），彻底关掉前，可以调下内存，事实证明，我把4个虚拟机都调成256M，运行流畅，也许是关了图形界面的缘故也没准……
+9、又是图省事：复制虚拟机文件夹为centos1，centos2，centos3，centos4，并重新通过vmware加载，改标签为leader，backup，rs1，rs2，好认，在里面也改hostname为这几个。
+10、VIP：192.168.184.138
+lvs1(leader):192.168.184.139
+lvs2(backup):192.168.184.140
+rs1: 192.168.184.141
+rs2: 192.168.184.142
+正式操作：
+1、主备LVS：yum install ipvsadm
+2、主备LVS：下载并安装keepalived-1.2.2.tar.gz
+1)需安装openssl-devel
+2)./configure &amp;ndash;prefix=/usr/local/keepalived
+3)make&amp;amp;&amp;amp;make install
+4)cp /usr/local/keepalived/etc/rc.d/init.d/keepalived /etc/rc.d/init.d/
+5)cp /usr/local/keepalived/etc/sysconfig/keepalived /etc/sysconfig/
+6)mkdir /etc/keepalived
+7)cp /usr/local/keepalived/etc/keepalived/keepalived.conf /etc/keepalived/
+8)cp /usr/local/keepalived/sbin/keepalived /sbin/
+3、主备LVS：建立负载脚本
+vim /sbin/lvsdr.sh
+ \#!/bin/bash VIP=192.168.184.138 RIP1=192.168.184.141 RIP2=192.168.184.142 /etc/rc.d/init.d/functions case &amp;quot;$1&amp;quot; in start) echo &amp;quot;start LVS of DirectorServer&amp;quot; \#Set th Virtual IP Address ifconfig eth0:1 $VIP broadcast $VIP netmask 255.</description>
+    </item>
+    
+    <item>
+      <title>centos上apache对下载限速问题，边研究边改～～</title>
+      <link>/blog/apache_rate_limit/</link>
+      <pubDate>Mon, 17 Oct 2011 14:14:38 +0800</pubDate>
+      
+      <guid>/blog/apache_rate_limit/</guid>
+      <description>LAMP下，总流量10MB/s下载速度，其中只想用一半带宽5MB/s做下载，另外一半带宽做升级，所以现在希望对下载的文件夹限速，现在的情况是这样的：
+1、mod_bw可以限制下载总速度，每个线程的下载最小速度，但是如果使用迅雷，则会超过最大速度，比如：
+BandWidth all 100（最大）
+MinBandWidth all 20 （最小10k）
+如果用迅雷下载，只对该原始地址，同时开10个线程，则最大速度会冲到200k（即最小速度*下载进程数）
+所以，mod_bw无论如何都是对迅雷无效的
+2、mod_limitipconn可以限制每个ip最多1个线程下载，这个确实可以限制迅雷的问题，但是，会造成每个内网用户同时只有一个人可以下载，这是希望最好可以避免的
+3、mod_cband，可以成功限制最大速度，但是暂时只找到了对整个虚拟目录限速的办法，这个即使回头找不到对目录限速的办法，做成多虚拟目录也可以解决，不过比较郁闷的问题是，他跟mod_bw的最小速度功能组合使用效果特别不好
+想到的解决办法：
+设置2个虚拟目录，下载和升级分别各自使用一个hostname，分别指向不同文件夹，分别对两个文件夹做最大下载速度限制
+会话平均带宽这个以后再说了，暂时没有啥好招
+如果谁有什么其他更方便的解决办法，请帮忙告诉我一下～～</description>
+    </item>
+    
+  </channel>
+</rss>

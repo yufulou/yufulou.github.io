@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>redis on yufulou&#39;s </title>
+    <link>/categories/redis/</link>
+    <description>Recent content in redis on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 29 Sep 2018 17:25:07 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/redis/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>redis可能波动的几种情况</title>
+      <link>/blog/redis-fluctruate/</link>
+      <pubDate>Sat, 29 Sep 2018 17:25:07 +0800</pubDate>
+      
+      <guid>/blog/redis-fluctruate/</guid>
+      <description>内存占用太大时，bgsave的fork复制内存
+aof文件fsync时间过长
+内存碎片太多，导致重新布局
+不常用的value入swap，导致读取变慢</description>
+    </item>
+    
+  </channel>
+</rss>

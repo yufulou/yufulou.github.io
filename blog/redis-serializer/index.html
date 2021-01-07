@@ -1,0 +1,1356 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <script type="application/ld+json">
+    {
+        "@context" : "http://schema.org",
+        "@type" : "BlogPosting",
+        "mainEntityOfPage": {
+             "@type": "WebPage",
+             "@id": "\/"
+        },
+        "articleSection" : "blog",
+        "name" : "jackson做redis反序列化时，反序列化Map\x3cInteger, T\x3e时的问题",
+        "headline" : "jackson做redis反序列化时，反序列化Map\x3cInteger, T\x3e时的问题",
+        "description" : "类似这个帖子提出的问题：https:\/\/stackoverflow.com\/questions\/55278446\/redis-caching-mapinteger-string\n即redis中事实上存储的都是字符串，包括key，但又需要反序列化成Map\x26lt;Integer, String\x26gt;类似的类型时，虽然能反序列化成功，但发现key的部分实际存储的还是字符串。\n文中提出了如下解决办法：\n但这个办法有个问题，如果是Integer为Key，Value为其他类型还是会有问题。\n故通过Class.getGenericSuperclass重新做了动态版的Serializer（参考：https:\/\/blog.csdn.net\/xuhailiang0816\/article\/details\/78403041）：\npublic class CustomJsonSerializer extends Jackson2JsonRedisSerializer { public CustomJsonSerializer(Class type) { super(type); } @Override protected JavaType getJavaType(Class clazz) { if (List.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length \x26gt; 0) { Class clazzT = (Class)typeList[0]; return TypeFactory.defaultInstance().constructCollectionType(List.class, clazzT); } } else if (Map.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length \x26gt; 1) { Class clazzKey = (Class)typeList[0]; Class clazzVal = (Class)typeList[1]; return TypeFactory.defaultInstance().constructMapType(Map.class, clazzKey, clazzVal); } } \/\/ 非map和list类型，返回默认构造器即可  return TypeFactory.",
+        "inLanguage" : "en",
+        "author" : "",
+        "creator" : "",
+        "publisher": "",
+        "accountablePerson" : "",
+        "copyrightHolder" : "",
+        "copyrightYear" : "2021",
+        "datePublished": "2021-01-04 14:14:38 \x2b0800 \x2b0800",
+        "dateModified" : "2021-01-04 14:14:38 \x2b0800 \x2b0800",
+        "url" : "\/blog\/redis-serializer\/",
+        "wordCount" : "293",
+        "keywords" : [ "Blog" ]
+    }
+    </script>
+        
+            
+                <title>jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</title>
+            
+        
+
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="generator" content="Hugo 0.60.1" />
+        
+
+
+        
+        
+            
+                <meta name="description" content="HTML5 UP theme, Future Imperfect with some extra goodies, ported by Julio Pescador. Powered by Hugo">
+            
+        
+
+        <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题"/>
+<meta name="twitter:description" content="类似这个帖子提出的问题：https://stackoverflow.com/questions/55278446/redis-caching-mapinteger-string
+即redis中事实上存储的都是字符串，包括key，但又需要反序列化成Map&lt;Integer, String&gt;类似的类型时，虽然能反序列化成功，但发现key的部分实际存储的还是字符串。
+文中提出了如下解决办法：
+但这个办法有个问题，如果是Integer为Key，Value为其他类型还是会有问题。
+故通过Class.getGenericSuperclass重新做了动态版的Serializer（参考：https://blog.csdn.net/xuhailiang0816/article/details/78403041）：
+public class CustomJsonSerializer extends Jackson2JsonRedisSerializer { public CustomJsonSerializer(Class type) { super(type); } @Override protected JavaType getJavaType(Class clazz) { if (List.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &gt; 0) { Class clazzT = (Class)typeList[0]; return TypeFactory.defaultInstance().constructCollectionType(List.class, clazzT); } } else if (Map.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &gt; 1) { Class clazzKey = (Class)typeList[0]; Class clazzVal = (Class)typeList[1]; return TypeFactory.defaultInstance().constructMapType(Map.class, clazzKey, clazzVal); } } // 非map和list类型，返回默认构造器即可  return TypeFactory."/>
+<meta name="twitter:site" content="@example"/>
+
+        <meta property="og:title" content="jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题" />
+<meta property="og:description" content="类似这个帖子提出的问题：https://stackoverflow.com/questions/55278446/redis-caching-mapinteger-string
+即redis中事实上存储的都是字符串，包括key，但又需要反序列化成Map&lt;Integer, String&gt;类似的类型时，虽然能反序列化成功，但发现key的部分实际存储的还是字符串。
+文中提出了如下解决办法：
+但这个办法有个问题，如果是Integer为Key，Value为其他类型还是会有问题。
+故通过Class.getGenericSuperclass重新做了动态版的Serializer（参考：https://blog.csdn.net/xuhailiang0816/article/details/78403041）：
+public class CustomJsonSerializer extends Jackson2JsonRedisSerializer { public CustomJsonSerializer(Class type) { super(type); } @Override protected JavaType getJavaType(Class clazz) { if (List.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &gt; 0) { Class clazzT = (Class)typeList[0]; return TypeFactory.defaultInstance().constructCollectionType(List.class, clazzT); } } else if (Map.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &gt; 1) { Class clazzKey = (Class)typeList[0]; Class clazzVal = (Class)typeList[1]; return TypeFactory.defaultInstance().constructMapType(Map.class, clazzKey, clazzVal); } } // 非map和list类型，返回默认构造器即可  return TypeFactory." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="/blog/redis-serializer/" />
+<meta property="article:published_time" content="2021-01-04T14:14:38+08:00" />
+<meta property="article:modified_time" content="2021-01-04T14:14:38+08:00" />
+
+        <meta property="og:image" content="//images/logo.png">
+        <meta property="og:image:type" content="image/png">
+        <meta property="og:image:width" content="512">
+        <meta property="og:image:height" content="512">
+        <meta itemprop="name" content="jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题">
+<meta itemprop="description" content="类似这个帖子提出的问题：https://stackoverflow.com/questions/55278446/redis-caching-mapinteger-string
+即redis中事实上存储的都是字符串，包括key，但又需要反序列化成Map&lt;Integer, String&gt;类似的类型时，虽然能反序列化成功，但发现key的部分实际存储的还是字符串。
+文中提出了如下解决办法：
+但这个办法有个问题，如果是Integer为Key，Value为其他类型还是会有问题。
+故通过Class.getGenericSuperclass重新做了动态版的Serializer（参考：https://blog.csdn.net/xuhailiang0816/article/details/78403041）：
+public class CustomJsonSerializer extends Jackson2JsonRedisSerializer { public CustomJsonSerializer(Class type) { super(type); } @Override protected JavaType getJavaType(Class clazz) { if (List.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &gt; 0) { Class clazzT = (Class)typeList[0]; return TypeFactory.defaultInstance().constructCollectionType(List.class, clazzT); } } else if (Map.class.isAssignableFrom(clazz)) { Type[] typeList = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments(); if (typeList.length &gt; 1) { Class clazzKey = (Class)typeList[0]; Class clazzVal = (Class)typeList[1]; return TypeFactory.defaultInstance().constructMapType(Map.class, clazzKey, clazzVal); } } // 非map和list类型，返回默认构造器即可  return TypeFactory.">
+<meta itemprop="datePublished" content="2021-01-04T14:14:38&#43;08:00" />
+<meta itemprop="dateModified" content="2021-01-04T14:14:38&#43;08:00" />
+<meta itemprop="wordCount" content="293">
+
+
+
+<meta itemprop="keywords" content="" />
+        
+
+        
+            
+        
+
+        
+        
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/atom-one-light.min.css">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:400,800,900|Source+Sans+Pro:400,700">
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.css">
+            <link rel="stylesheet" href="/css/main.css">
+            <link rel="stylesheet" href="/css/add-on.css">
+            <link rel="stylesheet" href="/css/academicons.min.css">
+        
+
+        
+            
+                
+            
+        
+
+
+  
+    
+    <link href='//cdn.bootcss.com/highlight.js/9.11.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+  
+
+
+      
+    </head>
+    <body>
+
+      
+      <div id="wrapper">
+
+    
+    
+<header id="header">
+    
+      <h1><a href="/">blog</a></h1>
+    
+
+    <nav class="links">
+        <ul>
+            
+                <li>
+                    <a href="/">
+                            <i class="fa fa-home">&nbsp;</i>Home
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/about/">
+                            <i class="fa fa-id-card-o">&nbsp;</i>About
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/blog/">
+                            <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/itemized/">
+                            <i class="fa fa-list">&nbsp;</i>Itemized
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/categories/">
+                            <i class="fa fa-sitemap">&nbsp;</i>Categories
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/contact/">
+                            <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                    </a>
+                </li>
+            
+        </ul>
+    </nav>
+    <nav class="main">
+        <ul>
+            
+            <li id="share-nav" class="share-menu" style="display:none;">
+                <a class="fa-share-alt" href="#share-menu">Share</a>
+            </li>
+            
+            <li class="search">
+                <a class="fa-search" href="#search">Search</a>
+                <form id="search" method="get" action="//google.com/search">
+                    <input type="text" name="q" placeholder="Search" />
+                    <input type="hidden" name="as_sitesearch" value="/">
+                </form>
+            </li>
+            <li class="menu">
+                <a class="fa-bars" href="#menu">Menu</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+
+
+<section id="menu">
+
+    
+        <section>
+            <form class="search" method="get" action="//google.com/search">
+                <input type="text" name="q" placeholder="Search" />
+                <input type="hidden" name="as_sitesearch" value="/">
+            </form>
+        </section>
+
+    
+        <section>
+            <ul class="links">
+                
+                    <li>
+                        <a href="/">
+                            <h3>
+                                <i class="fa fa-home">&nbsp;</i>Home
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/about/">
+                            <h3>
+                                <i class="fa fa-id-card-o">&nbsp;</i>About
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/blog/">
+                            <h3>
+                                <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/itemized/">
+                            <h3>
+                                <i class="fa fa-list">&nbsp;</i>Itemized
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/categories/">
+                            <h3>
+                                <i class="fa fa-sitemap">&nbsp;</i>Categories
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/contact/">
+                            <h3>
+                                <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                            </h3>
+                        </a>
+                    </li>
+                
+            </ul>
+        </section>
+
+    
+        <section class="recent-posts">
+            <div class="mini-posts">
+                <header>
+                    <h3>Recent Posts</h3>
+                </header>
+                
+
+                
+                    
+                
+
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-07'>
+                                    January 7, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-04'>
+                                    January 4, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2020-11-22'>
+                                    November 22, 2020</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-10-31'>
+                                    October 31, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-09-29'>
+                                    September 29, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+
+                
+                    <a href=
+                        
+                            /blog/
+                        
+                        class="button">View more posts</a>
+                
+            </div>
+        </section>
+
+    
+        
+</section>
+
+    <section id="share-menu">
+    <section id="social-share-nav">
+        <ul class="links">
+            <header>
+                <h3>Share this post <i class="fa fa-smile-o"></i></h3>
+            </header>
+            
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fredis-serializer%2f&amp;text=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fredis-serializer%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fredis-serializer%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fredis-serializer%2f&amp;title=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fredis-serializer%2f&amp;title=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fredis-serializer%2f&amp;title=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fredis-serializer%2f&amp;description=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fredis-serializer%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+        </ul>
+    </section>
+</section>
+
+    
+    <div id="main">
+        
+        
+        <article class="post">
+  <header>
+    <div class="title">
+        
+            <h1><a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a></h1>
+            
+        
+        
+    </div>
+    <div class="meta">
+        
+
+        <time class="published"
+            datetime='2021-01-04'>
+            January 4, 2021</time>
+        <span class="author"></span>
+        
+            <p>2 minute read</p>
+        
+        
+    </div>
+</header>
+
+
+  
+    <section id="social-share">
+      <ul class="icons">
+        
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fredis-serializer%2f&amp;text=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fredis-serializer%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fredis-serializer%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fredis-serializer%2f&amp;title=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fredis-serializer%2f&amp;title=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fredis-serializer%2f&amp;title=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fredis-serializer%2f&amp;description=jackson%e5%81%9aredis%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96%e6%97%b6%ef%bc%8c%e5%8f%8d%e5%ba%8f%e5%88%97%e5%8c%96Map%3cInteger%2c%20T%3e%e6%97%b6%e7%9a%84%e9%97%ae%e9%a2%98" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fredis-serializer%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+      </ul>
+    </section>
+  
+
+  
+
+  <div id="content">
+    <p>类似这个帖子提出的问题：https://stackoverflow.com/questions/55278446/redis-caching-mapinteger-string</p>
+<p>即redis中事实上存储的都是字符串，包括key，但又需要反序列化成Map&lt;Integer, String&gt;类似的类型时，虽然能反序列化成功，但发现key的部分实际存储的还是字符串。</p>
+<p>文中提出了如下解决办法：</p>
+<p><img src="/img/blog/redis-serializer/solving-jackson-redis-serializer.png" alt="image"></p>
+<p>但这个办法有个问题，如果是Integer为Key，Value为其他类型还是会有问题。</p>
+<p>故通过Class.getGenericSuperclass重新做了动态版的Serializer（参考：https://blog.csdn.net/xuhailiang0816/article/details/78403041）：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-java" data-lang="java"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">CustomJsonSerializer</span> <span style="color:#66d9ef">extends</span> Jackson2JsonRedisSerializer <span style="color:#f92672">{</span>
+
+    <span style="color:#66d9ef">public</span> <span style="color:#a6e22e">CustomJsonSerializer</span><span style="color:#f92672">(</span>Class type<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        <span style="color:#66d9ef">super</span><span style="color:#f92672">(</span>type<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+
+    <span style="color:#a6e22e">@Override</span>
+    <span style="color:#66d9ef">protected</span> JavaType <span style="color:#a6e22e">getJavaType</span><span style="color:#f92672">(</span>Class clazz<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        <span style="color:#66d9ef">if</span> <span style="color:#f92672">(</span>List<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">.</span><span style="color:#a6e22e">isAssignableFrom</span><span style="color:#f92672">(</span>clazz<span style="color:#f92672">)</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+            Type<span style="color:#f92672">[</span><span style="color:#f92672">]</span> typeList <span style="color:#f92672">=</span> <span style="color:#f92672">(</span><span style="color:#f92672">(</span>ParameterizedType<span style="color:#f92672">)</span>clazz<span style="color:#f92672">.</span><span style="color:#a6e22e">getGenericSuperclass</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">.</span><span style="color:#a6e22e">getActualTypeArguments</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+            <span style="color:#66d9ef">if</span> <span style="color:#f92672">(</span>typeList<span style="color:#f92672">.</span><span style="color:#a6e22e">length</span> <span style="color:#f92672">&gt;</span> 0<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+                Class clazzT <span style="color:#f92672">=</span> <span style="color:#f92672">(</span>Class<span style="color:#f92672">)</span>typeList<span style="color:#f92672">[</span>0<span style="color:#f92672">]</span><span style="color:#f92672">;</span>
+                <span style="color:#66d9ef">return</span> TypeFactory<span style="color:#f92672">.</span><span style="color:#a6e22e">defaultInstance</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">.</span><span style="color:#a6e22e">constructCollectionType</span><span style="color:#f92672">(</span>List<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">,</span> clazzT<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+            <span style="color:#f92672">}</span>
+        <span style="color:#f92672">}</span> <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> <span style="color:#f92672">(</span>Map<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">.</span><span style="color:#a6e22e">isAssignableFrom</span><span style="color:#f92672">(</span>clazz<span style="color:#f92672">)</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+            Type<span style="color:#f92672">[</span><span style="color:#f92672">]</span> typeList <span style="color:#f92672">=</span> <span style="color:#f92672">(</span><span style="color:#f92672">(</span>ParameterizedType<span style="color:#f92672">)</span>clazz<span style="color:#f92672">.</span><span style="color:#a6e22e">getGenericSuperclass</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">.</span><span style="color:#a6e22e">getActualTypeArguments</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+            <span style="color:#66d9ef">if</span> <span style="color:#f92672">(</span>typeList<span style="color:#f92672">.</span><span style="color:#a6e22e">length</span> <span style="color:#f92672">&gt;</span> 1<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+                Class clazzKey <span style="color:#f92672">=</span> <span style="color:#f92672">(</span>Class<span style="color:#f92672">)</span>typeList<span style="color:#f92672">[</span>0<span style="color:#f92672">]</span><span style="color:#f92672">;</span>
+                Class clazzVal <span style="color:#f92672">=</span> <span style="color:#f92672">(</span>Class<span style="color:#f92672">)</span>typeList<span style="color:#f92672">[</span>1<span style="color:#f92672">]</span><span style="color:#f92672">;</span>
+                <span style="color:#66d9ef">return</span> TypeFactory<span style="color:#f92672">.</span><span style="color:#a6e22e">defaultInstance</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">.</span><span style="color:#a6e22e">constructMapType</span><span style="color:#f92672">(</span>Map<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">,</span> clazzKey<span style="color:#f92672">,</span> clazzVal<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+            <span style="color:#f92672">}</span>
+        <span style="color:#f92672">}</span>
+        <span style="color:#75715e">// 非map和list类型，返回默认构造器即可
+</span><span style="color:#75715e"></span>        <span style="color:#66d9ef">return</span> TypeFactory<span style="color:#f92672">.</span><span style="color:#a6e22e">defaultInstance</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">.</span><span style="color:#a6e22e">constructType</span><span style="color:#f92672">(</span>clazz<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+<span style="color:#f92672">}</span>
+</code></pre></div><p>然后在定义CacheManager的时候引入这个类(我还增加了key对应ttl的设置)：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-java" data-lang="java"><span style="color:#a6e22e">@Configuration</span>
+<span style="color:#a6e22e">@EnableCaching</span>
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">RedisConfig</span> <span style="color:#66d9ef">extends</span> CachingConfigurerSupport <span style="color:#f92672">{</span>
+    <span style="color:#a6e22e">@Bean</span>
+    <span style="color:#a6e22e">@SuppressWarnings</span><span style="color:#f92672">(</span>value <span style="color:#f92672">=</span> <span style="color:#f92672">{</span><span style="color:#e6db74">&#34;unchecked&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;rawtypes&#34;</span><span style="color:#f92672">}</span><span style="color:#f92672">)</span>
+    <span style="color:#66d9ef">public</span> RedisTemplate<span style="color:#f92672">&lt;</span>Object<span style="color:#f92672">,</span> Object<span style="color:#f92672">&gt;</span> <span style="color:#a6e22e">redisTemplate</span><span style="color:#f92672">(</span>RedisConnectionFactory connectionFactory<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        RedisTemplate<span style="color:#f92672">&lt;</span>Object<span style="color:#f92672">,</span> Object<span style="color:#f92672">&gt;</span> template <span style="color:#f92672">=</span> <span style="color:#66d9ef">new</span> RedisTemplate<span style="color:#f92672">&lt;</span><span style="color:#f92672">&gt;</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        template<span style="color:#f92672">.</span><span style="color:#a6e22e">setConnectionFactory</span><span style="color:#f92672">(</span>connectionFactory<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+
+        Jackson2JsonRedisSerializer<span style="color:#f92672">&lt;</span>Object<span style="color:#f92672">&gt;</span> jackson2JsonRedisSerializer <span style="color:#f92672">=</span> getCustomSerializer<span style="color:#f92672">(</span>Object<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+
+        template<span style="color:#f92672">.</span><span style="color:#a6e22e">setValueSerializer</span><span style="color:#f92672">(</span>jackson2JsonRedisSerializer<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        <span style="color:#75715e">// 使用StringRedisSerializer来序列化和反序列化redis的key值
+</span><span style="color:#75715e"></span>        template<span style="color:#f92672">.</span><span style="color:#a6e22e">setKeySerializer</span><span style="color:#f92672">(</span><span style="color:#66d9ef">new</span> StringRedisSerializer<span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        template<span style="color:#f92672">.</span><span style="color:#a6e22e">afterPropertiesSet</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        <span style="color:#66d9ef">return</span> template<span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+
+    <span style="color:#75715e">/**
+</span><span style="color:#75715e">     * 指定 key 策略
+</span><span style="color:#75715e">     * 
+</span><span style="color:#75715e">     * @param redisConnectionFactory
+</span><span style="color:#75715e">     * @return
+</span><span style="color:#75715e">     */</span>
+    <span style="color:#a6e22e">@Bean</span>
+    <span style="color:#66d9ef">public</span> RedisCacheManager <span style="color:#a6e22e">cacheManager</span><span style="color:#f92672">(</span>RedisConnectionFactory redisConnectionFactory<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">new</span> RedisCacheManager<span style="color:#f92672">(</span>RedisCacheWriter<span style="color:#f92672">.</span><span style="color:#a6e22e">nonLockingRedisCacheWriter</span><span style="color:#f92672">(</span>redisConnectionFactory<span style="color:#f92672">)</span><span style="color:#f92672">,</span>
+            getRedisCacheConfigurationWithTtl<span style="color:#f92672">(</span>60<span style="color:#f92672">,</span> Object<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">)</span><span style="color:#f92672">,</span> getRedisCacheConfigurationMap<span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+
+    <span style="color:#66d9ef">private</span> Map<span style="color:#f92672">&lt;</span>String<span style="color:#f92672">,</span> RedisCacheConfiguration<span style="color:#f92672">&gt;</span> <span style="color:#a6e22e">getRedisCacheConfigurationMap</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        Map<span style="color:#f92672">&lt;</span>String<span style="color:#f92672">,</span> RedisCacheConfiguration<span style="color:#f92672">&gt;</span> redisCacheConfigurationMap <span style="color:#f92672">=</span> <span style="color:#66d9ef">new</span> HashMap<span style="color:#f92672">&lt;</span><span style="color:#f92672">&gt;</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        <span style="color:#66d9ef">for</span> <span style="color:#f92672">(</span>CacheTtl ttlItem <span style="color:#f92672">:</span> CacheTtl<span style="color:#f92672">.</span><span style="color:#a6e22e">values</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+            <span style="color:#75715e">// 根据配置，对每个key设置指定的反序列化器和超时时间
+</span><span style="color:#75715e"></span>            redisCacheConfigurationMap<span style="color:#f92672">.</span><span style="color:#a6e22e">put</span><span style="color:#f92672">(</span>ttlItem<span style="color:#f92672">.</span><span style="color:#a6e22e">getName</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">,</span>
+                getRedisCacheConfigurationWithTtl<span style="color:#f92672">(</span>ttlItem<span style="color:#f92672">.</span><span style="color:#a6e22e">getTtl</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">,</span> ttlItem<span style="color:#f92672">.</span><span style="color:#a6e22e">getClazz</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        <span style="color:#f92672">}</span>
+        <span style="color:#66d9ef">return</span> redisCacheConfigurationMap<span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+
+    <span style="color:#66d9ef">private</span> RedisCacheConfiguration <span style="color:#a6e22e">getRedisCacheConfigurationWithTtl</span><span style="color:#f92672">(</span>Integer seconds<span style="color:#f92672">,</span> Class objectClass<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        RedisCacheConfiguration redisCacheConfiguration <span style="color:#f92672">=</span> RedisCacheConfiguration<span style="color:#f92672">.</span><span style="color:#a6e22e">defaultCacheConfig</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        redisCacheConfiguration <span style="color:#f92672">=</span> redisCacheConfiguration
+            <span style="color:#f92672">.</span><span style="color:#a6e22e">serializeValuesWith</span><span style="color:#f92672">(</span>
+                RedisSerializationContext<span style="color:#f92672">.</span><span style="color:#a6e22e">SerializationPair</span><span style="color:#f92672">.</span><span style="color:#a6e22e">fromSerializer</span><span style="color:#f92672">(</span>getCustomSerializer<span style="color:#f92672">(</span>objectClass<span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span>
+            <span style="color:#f92672">.</span><span style="color:#a6e22e">entryTtl</span><span style="color:#f92672">(</span>Duration<span style="color:#f92672">.</span><span style="color:#a6e22e">ofSeconds</span><span style="color:#f92672">(</span>seconds<span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+
+        <span style="color:#66d9ef">return</span> redisCacheConfiguration<span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+
+    <span style="color:#66d9ef">private</span> CustomJsonSerializer <span style="color:#a6e22e">getCustomSerializer</span><span style="color:#f92672">(</span>Class objectClass<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        CustomJsonSerializer customSerializer <span style="color:#f92672">=</span> <span style="color:#66d9ef">new</span> CustomJsonSerializer<span style="color:#f92672">(</span>objectClass<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        ObjectMapper om <span style="color:#f92672">=</span> <span style="color:#66d9ef">new</span> ObjectMapper<span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        om<span style="color:#f92672">.</span><span style="color:#a6e22e">setVisibility</span><span style="color:#f92672">(</span>PropertyAccessor<span style="color:#f92672">.</span><span style="color:#a6e22e">ALL</span><span style="color:#f92672">,</span> JsonAutoDetect<span style="color:#f92672">.</span><span style="color:#a6e22e">Visibility</span><span style="color:#f92672">.</span><span style="color:#a6e22e">ANY</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        om<span style="color:#f92672">.</span><span style="color:#a6e22e">enableDefaultTyping</span><span style="color:#f92672">(</span>ObjectMapper<span style="color:#f92672">.</span><span style="color:#a6e22e">DefaultTyping</span><span style="color:#f92672">.</span><span style="color:#a6e22e">NON_FINAL</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        customSerializer<span style="color:#f92672">.</span><span style="color:#a6e22e">setObjectMapper</span><span style="color:#f92672">(</span>om<span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+        <span style="color:#66d9ef">return</span> customSerializer<span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+
+<span style="color:#f92672">}</span>
+</code></pre></div><p>这里配置key对应的超时时间和反序列化类型，如果非需要特殊处理的Integer为key的Map，实际上配置Object.class即可，如果同时不需要超时时间，这里可以不做相应配置，会直接使用默认缓存超时时间，超时时间的配置也是为了集中管理</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-java" data-lang="java"><span style="color:#a6e22e">@Getter</span>
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">enum</span> CacheTtl <span style="color:#f92672">{</span>
+    <span style="color:#75715e">// menuId和appId的对应关系
+</span><span style="color:#75715e"></span>    MENU_APP_MAP<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;menuAppMapCache&#34;</span><span style="color:#f92672">,</span> 60 <span style="color:#f92672">*</span> 30<span style="color:#f92672">,</span> Object<span style="color:#f92672">.</span><span style="color:#a6e22e">class</span><span style="color:#f92672">)</span><span style="color:#f92672">,</span>
+    FULL_ROUTE_MAP<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;fullRouteMap&#34;</span><span style="color:#f92672">,</span> 60 <span style="color:#f92672">*</span> 60<span style="color:#f92672">,</span> <span style="color:#f92672">(</span><span style="color:#66d9ef">new</span> HashMap<span style="color:#f92672">&lt;</span>Integer<span style="color:#f92672">,</span> AuthServiceRoute<span style="color:#f92672">&gt;</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+    <span style="color:#f92672">}</span><span style="color:#f92672">)</span><span style="color:#f92672">.</span><span style="color:#a6e22e">getClass</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span><span style="color:#f92672">)</span><span style="color:#f92672">;</span>
+
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">final</span> String name<span style="color:#f92672">;</span>
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">final</span> Integer ttl<span style="color:#f92672">;</span>
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">final</span> Class<span style="color:#f92672">&lt;</span><span style="color:#f92672">?</span><span style="color:#f92672">&gt;</span> clazz<span style="color:#f92672">;</span>
+
+    CacheTtl<span style="color:#f92672">(</span>String name<span style="color:#f92672">,</span> Integer ttl<span style="color:#f92672">,</span> Class<span style="color:#f92672">&lt;</span><span style="color:#f92672">?</span><span style="color:#f92672">&gt;</span> clazz<span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+        <span style="color:#66d9ef">this</span><span style="color:#f92672">.</span><span style="color:#a6e22e">name</span> <span style="color:#f92672">=</span> name<span style="color:#f92672">;</span>
+        <span style="color:#66d9ef">this</span><span style="color:#f92672">.</span><span style="color:#a6e22e">ttl</span> <span style="color:#f92672">=</span> ttl<span style="color:#f92672">;</span>
+        <span style="color:#66d9ef">this</span><span style="color:#f92672">.</span><span style="color:#a6e22e">clazz</span> <span style="color:#f92672">=</span> clazz<span style="color:#f92672">;</span>
+    <span style="color:#f92672">}</span>
+<span style="color:#f92672">}</span>
+</code></pre></div><p>然后配置一个Constants：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-java" data-lang="java"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">CacheConstants</span> <span style="color:#f92672">{</span>
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">final</span> <span style="color:#66d9ef">static</span> String MENU_APP_MAP_PREFIX <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;menuAppMapCache&#34;</span><span style="color:#f92672">;</span>
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">final</span> <span style="color:#66d9ef">static</span> String ROUTE_MAP_KEY <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;fullRouteMap&#34;</span><span style="color:#f92672">;</span>
+
+<span style="color:#f92672">}</span>
+</code></pre></div><p>之后代码中再用到类似需要缓存的场景时，就可以这么用了：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-java" data-lang="java"><span style="color:#a6e22e">@Cacheable</span><span style="color:#f92672">(</span>CacheConstants<span style="color:#f92672">.</span><span style="color:#a6e22e">ROUTE_MAP_KEY</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">public</span> Map<span style="color:#f92672">&lt;</span>Integer<span style="color:#f92672">,</span> AuthServiceRoute<span style="color:#f92672">&gt;</span> <span style="color:#a6e22e">getAuthServiceRouteMap</span><span style="color:#f92672">(</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
+<span style="color:#f92672">}</span>
+</code></pre></div><p>关于ttl的设置，还有个用spEL分析字符串的方案，还附带自动刷新缓存的功能，相当强大：https://www.jianshu.com/p/275cb42080d9</p>
+
+  </div>
+
+  <footer>
+    <ul class="stats">
+  <li class="categories">
+    <ul>
+        
+            
+            
+                <i class="fa fa-folder"></i>
+                
+                
+                <li><a class="article-category-link" href="/categories/java">java</a></li>
+                
+                
+                <li><a class="article-category-link" href="/categories/jackson">jackson</a></li>
+                
+                
+                <li><a class="article-category-link" href="/categories/serialize">serialize</a></li>
+                
+            
+        
+    </ul>
+  </li>
+  <li class="tags">
+    <ul>
+        
+    </ul>
+  </li>
+</ul>
+
+  </footer>
+
+</article>
+
+    <article class="post">
+        <div id="disqus_thread"></div>
+<script type="application/javascript">
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "shortname" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    </article>
+
+
+<ul class="actions pagination">
+    
+        <li><a href="/blog/kafka-rebalance-protocol/"
+                class="button big previous">【译】【原】kafka rebalance 协议详解</a></li>
+    
+
+    
+        <li><a href="/blog/select-medium-number/"
+                class="button big next">[转]在MySQL中，如何计算一组数据的中位数？</a></li>
+    
+</ul>
+
+
+    </div>
+    
+<section id="sidebar">
+
+  
+  <section id="intro">
+    
+    
+      
+        <a href='/' class="logo"><img src="/img/main/logo.jpg" alt="Hugo Future Imperfect" /></a>
+      
+    
+    
+      <header>
+        <h2>yufulou的楼</h2>
+        <p>try deep, try more</p>
+      </header>
+    
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+  </section>
+
+  
+  <section class="recent-posts">
+    <div class="mini-posts">
+      <header>
+        <h3>Recent Posts</h3>
+      </header>
+      <div class="posts-container">
+        
+
+        
+          
+        
+
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-07'>
+                January 7, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-04'>
+                January 4, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a>
+              </h3>
+              
+              <time class="published" datetime='2020-11-22'>
+                November 22, 2020
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a>
+              </h3>
+              
+              <time class="published" datetime='2018-10-31'>
+                October 31, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a>
+              </h3>
+              
+              <time class="published" datetime='2018-09-29'>
+                September 29, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+      </div>
+
+      
+        <a href=
+          
+            /blog/
+          
+        class="button">View more posts</a>
+      
+    </div>
+  </section>
+
+  
+  
+  
+  
+  
+    <section id="categories">
+      <header>
+        <h3>
+          <a href="/categories/">Categories</a>
+        </h3>
+      </header>
+        
+          
+        
+
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/php/">php</a>
+                <span style="float:right;">7</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mysql/">mysql</a>
+                <span style="float:right;">5</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                Uncategorized
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/linux/">linux</a>
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/js/">js</a>
+                <span style="float:right;">3</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/apache/">apache</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/jackson/">jackson</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/java/">java</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/kafka/">kafka</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/lvs/">lvs</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mongo/">mongo</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/op/">op</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/redis/">redis</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/serialize/">serialize</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/sql/">sql</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+    </section>
+  
+  
+
+  
+  
+    <section id="mini-bio">
+      <h3>About</h3>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent tellus lacus, auctor vehicula molestie quis, tempor quis velit. Quisque in quam ac leo efficitur vulputate. Phasellus ullamcorper aliquam sodales. Maecenas sit amet condimentum ipsum. Proin sit amet ligula elit. Mauris.</p>
+      <a href="/about/" class="button">Learn More</a>
+    </section>
+  
+
+  
+  <section id="footer">
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+    <p class="copyright">
+      
+        &copy; 2021
+        
+          yufulou&#39;s 
+        
+      .
+      Powered by <a href="//gohugo.io" target="_blank">Hugo</a>
+    </p>
+  </section>
+</section>
+
+    </div>
+    <a id="back-to-top" href="#" class="fa fa-arrow-up fa-border fa-2x"></a>
+    
+
+    
+      
+    
+
+    
+      
+      
+      
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/highlight.min.js"></script>
+        
+        
+        
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/r.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/yaml.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/css.min.js"></script>
+        <script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+      
+    
+    
+    
+      <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/skel/3.0.1/skel.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.js"></script>
+      <script src="/js/util.js"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/backToTop.js"></script>
+    
+
+    
+      
+        
+      
+    
+
+    
+    <script>hljs.initHighlightingOnLoad();</script>
+      <script src="//yihui.name/js/math-code.js"></script>
+<script async
+src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+
+  </body>
+</html>
+

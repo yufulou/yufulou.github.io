@@ -1,0 +1,1412 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <script type="application/ld+json">
+    {
+        "@context" : "http://schema.org",
+        "@type" : "BlogPosting",
+        "mainEntityOfPage": {
+             "@type": "WebPage",
+             "@id": "\/"
+        },
+        "articleSection" : "blog",
+        "name" : "【译】【原】kafka rebalance 协议详解",
+        "headline" : "【译】【原】kafka rebalance 协议详解",
+        "description" : "原文：https:\/\/medium.com\/streamthoughts\/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2\n 从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。\n这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。\nKafka \x26amp; The Rebalance Protocol 101 Let’s go back to some basics Apache Kafka是一个基于分布式、发布\/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。\npartitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。\npartition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。\n下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-\x26gt;C1, P1-\x26gt;C2, P2-\x26gt;C3, P3-\x26gt;C1。\n如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。\nKafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景\n让我们深挖一下这个协议\nThe Rebalance Protocol, in a Nutshell 首先，我们先定义何为Apache Kafka的Rebalance。\nRebalance\/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https:\/\/cwiki.apache.org\/confluence\/display\/KAFKA\/Incremental\x2bCooperative\x2bRebalancing%3A\x2bSupport\x2band\x2bPolicies）\n以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。\n这里是一些Rebalance Protocol的应用：\n  Confluence Schema Registry 依赖rebalancing选主。\n  Kafka Connect 用其在多个worker中分配task和connector。\n  Kafka Stream 用其对多个应用流实例分配task和partition。",
+        "inLanguage" : "en",
+        "author" : "",
+        "creator" : "",
+        "publisher": "",
+        "accountablePerson" : "",
+        "copyrightHolder" : "",
+        "copyrightYear" : "2020",
+        "datePublished": "2020-11-22 16:05:52 \x2b0800 \x2b0800",
+        "dateModified" : "2020-11-22 16:05:52 \x2b0800 \x2b0800",
+        "url" : "\/blog\/kafka-rebalance-protocol\/",
+        "wordCount" : "305",
+        "keywords" : [ "Blog" ]
+    }
+    </script>
+        
+            
+                <title>【译】【原】kafka rebalance 协议详解</title>
+            
+        
+
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="generator" content="Hugo 0.60.1" />
+        
+
+
+        
+        
+            
+                <meta name="description" content="HTML5 UP theme, Future Imperfect with some extra goodies, ported by Julio Pescador. Powered by Hugo">
+            
+        
+
+        <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="【译】【原】kafka rebalance 协议详解"/>
+<meta name="twitter:description" content="原文：https://medium.com/streamthoughts/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2
+ 从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。
+这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。
+Kafka &amp; The Rebalance Protocol 101 Let’s go back to some basics Apache Kafka是一个基于分布式、发布/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。
+partitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。
+partition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。
+下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-&gt;C1, P1-&gt;C2, P2-&gt;C3, P3-&gt;C1。
+如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。
+Kafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景
+让我们深挖一下这个协议
+The Rebalance Protocol, in a Nutshell 首先，我们先定义何为Apache Kafka的Rebalance。
+Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https://cwiki.apache.org/confluence/display/KAFKA/Incremental&#43;Cooperative&#43;Rebalancing%3A&#43;Support&#43;and&#43;Policies）
+以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。
+这里是一些Rebalance Protocol的应用：
+  Confluence Schema Registry 依赖rebalancing选主。
+  Kafka Connect 用其在多个worker中分配task和connector。
+  Kafka Stream 用其对多个应用流实例分配task和partition。"/>
+<meta name="twitter:site" content="@example"/>
+
+        <meta property="og:title" content="【译】【原】kafka rebalance 协议详解" />
+<meta property="og:description" content="原文：https://medium.com/streamthoughts/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2
+ 从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。
+这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。
+Kafka &amp; The Rebalance Protocol 101 Let’s go back to some basics Apache Kafka是一个基于分布式、发布/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。
+partitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。
+partition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。
+下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-&gt;C1, P1-&gt;C2, P2-&gt;C3, P3-&gt;C1。
+如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。
+Kafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景
+让我们深挖一下这个协议
+The Rebalance Protocol, in a Nutshell 首先，我们先定义何为Apache Kafka的Rebalance。
+Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https://cwiki.apache.org/confluence/display/KAFKA/Incremental&#43;Cooperative&#43;Rebalancing%3A&#43;Support&#43;and&#43;Policies）
+以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。
+这里是一些Rebalance Protocol的应用：
+  Confluence Schema Registry 依赖rebalancing选主。
+  Kafka Connect 用其在多个worker中分配task和connector。
+  Kafka Stream 用其对多个应用流实例分配task和partition。" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="/blog/kafka-rebalance-protocol/" />
+<meta property="article:published_time" content="2020-11-22T16:05:52+08:00" />
+<meta property="article:modified_time" content="2020-11-22T16:05:52+08:00" />
+
+        <meta property="og:image" content="//images/logo.png">
+        <meta property="og:image:type" content="image/png">
+        <meta property="og:image:width" content="512">
+        <meta property="og:image:height" content="512">
+        <meta itemprop="name" content="【译】【原】kafka rebalance 协议详解">
+<meta itemprop="description" content="原文：https://medium.com/streamthoughts/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2
+ 从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。
+这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。
+Kafka &amp; The Rebalance Protocol 101 Let’s go back to some basics Apache Kafka是一个基于分布式、发布/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。
+partitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。
+partition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。
+下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-&gt;C1, P1-&gt;C2, P2-&gt;C3, P3-&gt;C1。
+如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。
+Kafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景
+让我们深挖一下这个协议
+The Rebalance Protocol, in a Nutshell 首先，我们先定义何为Apache Kafka的Rebalance。
+Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https://cwiki.apache.org/confluence/display/KAFKA/Incremental&#43;Cooperative&#43;Rebalancing%3A&#43;Support&#43;and&#43;Policies）
+以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。
+这里是一些Rebalance Protocol的应用：
+  Confluence Schema Registry 依赖rebalancing选主。
+  Kafka Connect 用其在多个worker中分配task和connector。
+  Kafka Stream 用其对多个应用流实例分配task和partition。">
+<meta itemprop="datePublished" content="2020-11-22T16:05:52&#43;08:00" />
+<meta itemprop="dateModified" content="2020-11-22T16:05:52&#43;08:00" />
+<meta itemprop="wordCount" content="305">
+
+
+
+<meta itemprop="keywords" content="" />
+        
+
+        
+            
+        
+
+        
+        
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/atom-one-light.min.css">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:400,800,900|Source+Sans+Pro:400,700">
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.css">
+            <link rel="stylesheet" href="/css/main.css">
+            <link rel="stylesheet" href="/css/add-on.css">
+            <link rel="stylesheet" href="/css/academicons.min.css">
+        
+
+        
+            
+                
+            
+        
+
+
+  
+    
+    <link href='//cdn.bootcss.com/highlight.js/9.11.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+  
+
+
+      
+    </head>
+    <body>
+
+      
+      <div id="wrapper">
+
+    
+    
+<header id="header">
+    
+      <h1><a href="/">blog</a></h1>
+    
+
+    <nav class="links">
+        <ul>
+            
+                <li>
+                    <a href="/">
+                            <i class="fa fa-home">&nbsp;</i>Home
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/about/">
+                            <i class="fa fa-id-card-o">&nbsp;</i>About
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/blog/">
+                            <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/itemized/">
+                            <i class="fa fa-list">&nbsp;</i>Itemized
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/categories/">
+                            <i class="fa fa-sitemap">&nbsp;</i>Categories
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/contact/">
+                            <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                    </a>
+                </li>
+            
+        </ul>
+    </nav>
+    <nav class="main">
+        <ul>
+            
+            <li id="share-nav" class="share-menu" style="display:none;">
+                <a class="fa-share-alt" href="#share-menu">Share</a>
+            </li>
+            
+            <li class="search">
+                <a class="fa-search" href="#search">Search</a>
+                <form id="search" method="get" action="//google.com/search">
+                    <input type="text" name="q" placeholder="Search" />
+                    <input type="hidden" name="as_sitesearch" value="/">
+                </form>
+            </li>
+            <li class="menu">
+                <a class="fa-bars" href="#menu">Menu</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+
+
+<section id="menu">
+
+    
+        <section>
+            <form class="search" method="get" action="//google.com/search">
+                <input type="text" name="q" placeholder="Search" />
+                <input type="hidden" name="as_sitesearch" value="/">
+            </form>
+        </section>
+
+    
+        <section>
+            <ul class="links">
+                
+                    <li>
+                        <a href="/">
+                            <h3>
+                                <i class="fa fa-home">&nbsp;</i>Home
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/about/">
+                            <h3>
+                                <i class="fa fa-id-card-o">&nbsp;</i>About
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/blog/">
+                            <h3>
+                                <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/itemized/">
+                            <h3>
+                                <i class="fa fa-list">&nbsp;</i>Itemized
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/categories/">
+                            <h3>
+                                <i class="fa fa-sitemap">&nbsp;</i>Categories
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/contact/">
+                            <h3>
+                                <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                            </h3>
+                        </a>
+                    </li>
+                
+            </ul>
+        </section>
+
+    
+        <section class="recent-posts">
+            <div class="mini-posts">
+                <header>
+                    <h3>Recent Posts</h3>
+                </header>
+                
+
+                
+                    
+                
+
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-07'>
+                                    January 7, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-04'>
+                                    January 4, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2020-11-22'>
+                                    November 22, 2020</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-10-31'>
+                                    October 31, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-09-29'>
+                                    September 29, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+
+                
+                    <a href=
+                        
+                            /blog/
+                        
+                        class="button">View more posts</a>
+                
+            </div>
+        </section>
+
+    
+        
+</section>
+
+    <section id="share-menu">
+    <section id="social-share-nav">
+        <ul class="links">
+            <header>
+                <h3>Share this post <i class="fa fa-smile-o"></i></h3>
+            </header>
+            
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;text=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fkafka-rebalance-protocol%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fkafka-rebalance-protocol%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;title=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;title=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;title=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;description=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fkafka-rebalance-protocol%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+        </ul>
+    </section>
+</section>
+
+    
+    <div id="main">
+        
+        
+        <article class="post">
+  <header>
+    <div class="title">
+        
+            <h1><a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a></h1>
+            
+        
+        
+    </div>
+    <div class="meta">
+        
+
+        <time class="published"
+            datetime='2020-11-22'>
+            November 22, 2020</time>
+        <span class="author"></span>
+        
+            <p>2 minute read</p>
+        
+        
+    </div>
+</header>
+
+
+  
+    <section id="social-share">
+      <ul class="icons">
+        
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;text=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fkafka-rebalance-protocol%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fkafka-rebalance-protocol%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;title=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;title=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;title=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fkafka-rebalance-protocol%2f&amp;description=%e3%80%90%e8%af%91%e3%80%91%e3%80%90%e5%8e%9f%e3%80%91kafka%20rebalance%20%e5%8d%8f%e8%ae%ae%e8%af%a6%e8%a7%a3" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fkafka-rebalance-protocol%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+      </ul>
+    </section>
+  
+
+  
+
+  <div id="content">
+    <blockquote>
+<p>原文：https://medium.com/streamthoughts/apache-kafka-rebalance-protocol-or-the-magic-behind-your-streams-applications-e94baf68e4f2</p>
+</blockquote>
+<p>从Apache Kafka 2.3.0版本开始，其内部Rebalance协议，特别是用于Kafka Connector和consumer上的协议，已经有了多次重大改进，这个协议现在看起来变复杂了很多，而且有时候看起来很炫酷。</p>
+<p>这篇文章会始于rebalance protocol的基础，即kafka consumer协议的核心，随后，我们会讨论他的限制以及最新的改进。</p>
+<h1 id="kafka--the-rebalance-protocol-101">Kafka &amp; The Rebalance Protocol 101</h1>
+<h2 id="lets-go-back-to-some-basics">Let’s go back to some basics</h2>
+<p>Apache Kafka是一个基于分布式、发布/订阅模式的流式处理平台。首先，producers进程发送消息到topics，broker集群管理并且保存这些topic。消费者进程订阅这些topic来获取并处理发布其上的消息。一个topic分布于多个broker，即每个broker管理一个发布到该topic的消息的子集，而这个子集被称为partition。topic创建时确定partition的数量，并且这个数量可能随时间而增长（要留意这个操作带来的影响）。partition的概念非常重要，因为他是Kafka的producer和consumer进程执行并行操作的最小单元。</p>
+<p>partitions允许producer进程并行写入消息。消息发送时可指定一个key，该key被用来进行hash从而计算出消息该被发送到哪个目标partition。这个机制确保了发送时指定了相同key的消息都会被发送到相同的partition。此外，该机制同时确保了consumer进程会按照发送的顺序消费该partition上的消息。</p>
+<p>partition的数量同时决定了某一个consumer group中活跃consumer进程的最大数量。consumer group是kafka为了对多个consumer client分组而提出的一个逻辑组机制，目的是使多个partition被负载均衡地消费。Kafka确保同一个topic下的一个partition只能同时分派给consumer group中的一个consumer。</p>
+<p>下图说明了这个概念，A是一个consumer group，该group下有3个consumer。这些consumer订阅了topic A，partition分配如下：P0-&gt;C1, P1-&gt;C2, P2-&gt;C3, P3-&gt;C1。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Consumer-Group.jpeg" alt="image" title="Apache Kafka — Consumer Group"></p>
+<p>如果某个consumer由于被手动停掉或者挂掉，而离开了这个组，则partition会在该组剩下的consumer中进行自动重新分配。同样的，如果一个consumer(重新)加入到这个组，也会触发相同行为。</p>
+<p>Kafka Rebalance Protocol即被用于这种多个consumer客户端在一个动态组中协作的场景</p>
+<p>让我们深挖一下这个协议</p>
+<h2 id="the-rebalance-protocol-in-a-nutshell">The Rebalance Protocol, in a Nutshell</h2>
+<p>首先，我们先定义何为Apache Kafka的Rebalance。</p>
+<p>Rebalance/Rebalancing: 一个流程，即多个使用kafka客户端和（或）Kafka coordinator的分布式进程，构成了一个通常意义上的组，并且使一组资源分布于该组的成员进程上（原文：https://cwiki.apache.org/confluence/display/KAFKA/Incremental+Cooperative+Rebalancing%3A+Support+and+Policies）</p>
+<p>以上定义并没有引用任何有关consumer或partition的概念，而是使用了成员和资源的概念，是因为Rebalance Protocol不只是能管理consumer，同时也可用于协调任何进程组。</p>
+<p>这里是一些Rebalance Protocol的应用：</p>
+<ul>
+<li>
+<p>Confluence Schema Registry 依赖rebalancing选主。</p>
+</li>
+<li>
+<p>Kafka Connect 用其在多个worker中分配task和connector。</p>
+</li>
+<li>
+<p>Kafka Stream 用其对多个应用流实例分配task和partition。</p>
+</li>
+</ul>
+<p><img src="/img/blog/kafka-rebalance-protocol/Rebalance-Protocol-components.jpeg" alt="image" title="Apache Kafka Rebalance Protocol and components"></p>
+<p>此外，Rebalance机制包含两个重要协议（划重点）：Group Membership Protocol和Client Embedded Protocol。</p>
+<p>首先说Group Membership Protocol，就像这个名字一样，这个协议被用来管理组内成员的协作。当一个客户端要加入一个组时，他要和Kafka broker（也即coordinator）之间产生一系列的请求/响应。</p>
+<p>Client Embedded Protocol是执行于客户端侧的协议，他通过嵌入第一个客户端，从而扩展该客户端的功能。比如这个协议被用于partition在组成员间的分配。</p>
+<p>现在我们对Rebalance Protocol有了更深一步的认识，接下来让我们演示一下他是如何应用于在consumer组内分配partition的</p>
+<h2 id="joingroup">JoinGroup</h2>
+<p>当consumer启动时，它会发送一个FindCoordinator请求获取负责协调所在消费组的Kafka broker coordinator，随后便通过发送JoinGroup请求初始化Rebalance protocol</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/JoinGroup-Request.jpeg" alt="image" title="Consumer — Rebalance Protocol — JoinGroup Request"></p>
+<p>可以看到，JoinGroup请求包含了一些consumer端的配置，如session.timeout.ms和max.poll.interval.ms，这些属性被coordinator用于在得不到成员回应时，把该成员移出组的逻辑。</p>
+<p>此外，这个请求同时包含了两个非常重要的字段：成员支持的protocol列表，和被用于执行某个embedded client protocol的元数据。在这个例子里，成员协议列表是由partition的分配者为consumer配置的（比如，partition.assignment.strategy），元数据包含了consumer订阅了的topic列表。</p>
+<p>如果你不知道这些字段的功能，推荐你阅读官方文档。</p>
+<p>JoinGroup行为扮演着一个屏障的角色，即如果没收到consumer发送的请求（比如，在group.initial.rebalance.delay.ms限定的时间内），或者达到了Rebalance超时时间，那么coordinator就不会发送任何响应了。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/JoinGroup-Response.jpeg" alt="image" title="Consumer — Rebalance Protocol — JoinGroup Response"></p>
+<p>组内第一个consumer会成为当前组的leader，收到当前consumer组的活跃成员列表，并且选择一种分配策略，其他consumer则只会收到一个空的响应。组leader负责执行本地partition的分配工作。</p>
+<h2 id="syncgroup">SyncGroup</h2>
+<p>之后，所有成员都发送给coordinator一个内容为空的SyncGroup请求，而组leader会在该请求中附上其计算过的分配方案。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/SyncGroup-Request.jpeg" alt="image" title="Consumer — Rebalance Protocol — SyncGroup Request"></p>
+<p>当coordinator响应了所有的SyncGroup请求，每个consumer会收到分配与其的partition，依据配置的listener执行PartitionAssignmentMethod方法（译注：这里我也没太懂），并开始收取消息。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/SyncGroup-Response.jpeg" alt="image" title="Consumer — Rebalance Protocol — SyncGroup Response"></p>
+<h2 id="heartbeat">Heartbeat</h2>
+<p>最后重要一点，每个consumer会定期（heartbeat.interval.ms）向brokercoordinator发送hearbeat请求，从而保持session活跃。</p>
+<p>如果一个Rebalance任务开始执行了，则coordinator会使用heartbeat的响应，去告知所有consumer重新加入这个组</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Heartbeat.jpeg" alt="image" title="Consumer — Rebalance Protocol — Heartbeat"></p>
+<p>在真实的分布式场景或者任何场景中，错误总会发生，硬件会损坏，网络或者consumer可能会发生瞬时的错误。然而所有这些错误都会触发Rebalance。</p>
+<h2 id="some-caveats">Some caveats</h2>
+<p>首先，Rebalance protocol为了处理一个成员，必须要停止组内所有成员（STW效应）</p>
+<p>比如，让我们正常地停掉一个组内实例，则会发生第一个Rebalance场景，这个被停掉的consumer会在停止前，发送给coordinator一个LeaveGroup请求</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/LeaveGroup.jpeg" alt="image" title="Consumer — Rebalance Protocol — LeaveGroup"></p>
+<p>剩下的consumers会在下一次心跳时，被通知要执行Rebalance流程了，所以要重新执行一次JoinGroup/SyncGroup流程，从而去获取重新分配的partition列表</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Rejoin.jpeg" alt="image" title="Consumer — Rebalance Protocol — Rejoin"></p>
+<p>在整个Rebalance过程中（partition被重新分配前），consumers不再处理任何数据。并且默认Rebalance超时时间被固定为5分钟，在不断增长的consumer时间延迟的场景中，这么长的超时时间会造成很大问题。</p>
+<p>就会发生这样的问题，比如，consumer刚从一个瞬时的错误中恢复，则他重新回到这个组时，就会触发一次Rebalance并且导致所有consumer停止（而在错误发生时已经STW了一次）</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Restart.jpeg" alt="image" title="Consumer — Rebalance Protocol — Restart"></p>
+<p>另外一个导致重启的原因是全组成员滚动升级，这对consumption group是一个十分严重情况。对一个有三个consumer的组，这种操作会触发6次Rebalance，从而严重影响到消息处理过程</p>
+<p>最后要说，在Java环境下运行的kafka consumer通常会有这两个常见问题：</p>
+<ol>
+<li>
+<p>丢失heartbeat请求 &ndash; 可能由于网络超时，gc暂停</p>
+</li>
+<li>
+<p>没有定期执行KafkaConsumer#poll()方法 &ndash; 由于一次消息处理太久超时</p>
+</li>
+</ol>
+<p>在问题1的场景中，coordinator在session.timeout.ms配置的时间内，没有收到heartbeat请求，认为这个consumer已经挂掉了。</p>
+<p>在问题2的场景中，处理拉取到的消息的时间超过了max.poll.inteval.ms配置的时间。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Timeout.jpeg" alt="image" title="Consumer — Rebalance Protocol — Timeout"></p>
+<h1 id="static-membership">Static Membership</h1>
+<p>为了减少由于consumer发生瞬时失败导致的Rebalance，Apache Kafka 2.3版本引入了Static Membership的概念（KIP-345）</p>
+<p>static membership的主要方案是每个consumer绑定一个唯一标识id（配置于group.instance.id），并且这些consumer的id会在发送JoinGroup请求时发送给coordinator &ndash; 依据扩展后Membership protocol</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/JoinGroup2.jpeg" alt="image" title=""></p>
+<p>如果一个consumer重启或者由于瞬时错误而被kill了，因为这个consumer不是通过正常发送LeaveGroup请求而停止的，则在触达session.timeout.ms时间以前，broker coordinator不会通知其他consumer进行Rebalance流程</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Restarting-Or-Killed-Due-To-Transient-Failure.jpeg" alt="image" title=""></p>
+<p>当这个consumer从错误恢复，并重新回到组时，broker coordinator会把之前缓存了的任务重新发给他，而不用经历任何Rebalance过程</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/IsRestarting.jpeg" alt="image" title=""></p>
+<p>当使用static membership时，建议加大consumer的session.timeout.ms的属性值，以防broker coordinator会频繁触发Rebalance。</p>
+<p>一方面说，static membership机制可以有效避免无效的Rebalance从而最少化STW影响。但从另一方面，这也降低了partition的可用性，因为coordinator可能要数分钟后（session.timeout.ms）才能检测到一个挂掉的consumer。然而，这即是我们在分布式系统中永恒的话题：可用性VS分区容错性（译注：不应该是可用性和一致性么？）</p>
+<h1 id="incremental-cooperative-rebalancing">Incremental Cooperative Rebalancing</h1>
+<p>除了减少STW影响的改进，在Apache Kafka 2.3版中还引入了一些新的embedded protocol来增强资源可用性。</p>
+<p>这些新增protocol的主要想法是：增量和协作地Rebalance，换句话说，这也意味着要执行多次Rebalance</p>
+<p>增量协作地Rebalance最开始被Kafka Connect引入（KIP-415，Kafka2.3也部分实现了）。并会在Kafka 2.4版本中对stream和consumer可用（KIP-429）</p>
+<h2 id="kafka-connect-limitations">Kafka Connect Limitations</h2>
+<p>Kafka Connect使用group membership protocol为组成connect集群的worker平均地分配connector和task。因此，当一个节点故障或重启，task扩容或缩容，配置提交或修改时，这些worker会相互协作地Rebalance connector和task</p>
+<p>然而在Kafka 2.3以前，不管以上哪种情况发生，所有已存在的connector都会被中断（像STW），因此，用多个connector去扩容一个相互作用的集群变成了一件非常困难的事</p>
+<p>增量协作地Rebalance尝试通过如下两种方法解决这个问题：</p>
+<ol>
+<li>
+<p>只有resource被回收才会停止task和member</p>
+</li>
+<li>
+<p>处理临时的member资源分配不平衡，立即或延迟（延迟方案对滚动重启的情况很有用）</p>
+</li>
+</ol>
+<p>为了实现上述方法，依据增量协作Rebalance原则，构成了如下3种方案：</p>
+<ul>
+<li>
+<p>Design I: 简单协作的Rebalancing</p>
+</li>
+<li>
+<p>Design II: 延迟处理不平衡状态</p>
+</li>
+<li>
+<p>Design III: 增量处理不平衡状态</p>
+</li>
+</ul>
+<p>为了使你更好的理解增量协作的Rebalancing是如何工作的，下面要给你演示一下Kafka Connect是如何使用Design II的</p>
+<h2 id="deferred-resolution-of-imbalance">Deferred Resolution of Imbalance</h2>
+<p>首先，这是一个由3个worker构成的connect集群，同时被分配了task和connector</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/Initial-assignment.jpeg" alt="image" title="1 — Initial assignment"></p>
+<p>1 — Initial assignment</p>
+<p>现在，W2由于一些莫名原因挂掉了，在session timeout时间后离开了集群，Rebalance流程被触发，存活的W1和W3 rejoin到这个组，发送了包含他们上一次的分配记录的JoinGroup请求，分配记录是使用Group Membership protocol规定的member_metadata字段传输的。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/w2-leave-rebalance-is-triggered.jpeg" alt="image" title="2 — W2 leaves the group and rebalance is triggered -- W1, W3 join."></p>
+<p>2 — W2 leaves the group and rebalance is triggered (W1, W3 join).</p>
+<p>W1被选为当前组的leader，他根据与上一次的分配计划，计算本次分配计划，此时W1会发现，一些上次分配计划中的task和connector不见了。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/leader-computes-assignments.jpeg" alt="image" title="3 — W1 becomes leader and computes assignments"></p>
+<p>3 — W1 becomes leader and computes assignments</p>
+<p>W1发送他计算后的新的分配计划（包含之前被撤回的资源），你会发现W1实际不会马上解决当前那些未被分配的资源（或是分配不均的状态），他会安排另外一次延迟的Rebalance流程解决这个问题，从而给那个挂掉的成员一些时间自己恢复回来，这个延迟时间通过一个新增的配置设定：scheduled.rebalance.max.delay.ms，默认为5分钟</p>
+<p>注意：在增量协同Rebalancing时，当一个成员被分配一个新的分区，他会马上开始处理这个新分配的分区。然而，当其被分配到一个之前被撤回的分区时，他会停止处理，提交，并立即开启一个新的join group流程。这会导致增加一些Rebalancing次数，但只在给他的分配计划发生变化时才会发生。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/receive-assignments.jpeg" alt="image" title="4 — W1, W3 receive assignments"></p>
+<p>4 — W1, W3 receive assignments</p>
+<p>W2在延迟超时时间以前重新回到组，并且触发了一次Rebalance。W1和W2也重新回到组。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/rebalance-is-triggered.jpeg" alt="image" title="5 — B rejoins the group before delay expire and a rebalance is triggered"></p>
+<p>5 — B rejoins the group before delay expire and a rebalance is triggered</p>
+<p>然而，直到计划的Rebalance被触发，W1不会重新分配那些不见的task和connector</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/not-reassign-missing-resources-until-delay-expires.jpeg" alt="image" title="6 — W1 will not reassign missing resources until delay expires"></p>
+<p>6 — W1 will not reassign missing resources until delay expires</p>
+<p>在达到计划的超时时间后，最终的Rebalance被触发，所有worker执行rejoin流程</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/all-receive-assignments.jpeg" alt="image" title="7 — W1, W2, W3 receive assignments"></p>
+<p>7 — W1, W2, W3 receive assignments</p>
+<p>最终，组leader重新分配A-Task-1和Connector-B给W2，在所有这些过程里，W1和W3从来没有过停止处理一开始分配给他们的task。</p>
+<p><img src="/img/blog/kafka-rebalance-protocol/all-members-join.jpeg" alt="image" title="8 — After delay, all members join"></p>
+<p>8 — After delay, all members join</p>
+<h1 id="conclusion">Conclusion</h1>
+<p>Rebalance protocol是Kafka消费机制的基础组件。但他同时也是一个面向一组互相协作的分组成员、并向这些成员分配资源（如Kafka Connect）的一种通用协议，增强这个协议的健壮性和可扩展性的同时，也使Static Membership和增量协同Rebalancing这两个特性对Apache Kafka产生极大的改进。</p>
+<p>To learn more about the rebalance protocol and how it works have a look to the following links.
+Sources :
+KIP-429, KIP-415, KIP-453
+<a href="https://cwiki.apache.org/confluence/display/KAFKA/Incremental+Cooperative+Rebalancing%3A+Support+and+Policies">https://cwiki.apache.org/confluence/display/KAFKA/Incremental+Cooperative+Rebalancing%3A+Support+and+Policies</a>
+<a href="https://kafka.apache.org/protocol">https://kafka.apache.org/protocol</a>
+The Magical Rebalance Protocol of Apache Kafka by Gwen Shapira
+<a href="https://www.slideshare.net/ConfluentInc/everything-you-always-wanted-to-know-about-kafkas-rebalance-protocol-but-were-afraid-to-ask-matthias-j-sax-confluent-kafka-summit-london-2019">https://www.slideshare.net/ConfluentInc/everything-you-always-wanted-to-know-about-kafkas-rebalance-protocol-but-were-afraid-to-ask-matthias-j-sax-confluent-kafka-summit-london-2019</a>
+<a href="https://www.slideshare.net/ConfluentInc/rebalance-protocol-insideout-a-developer-perspective">https://www.slideshare.net/ConfluentInc/rebalance-protocol-insideout-a-developer-perspective</a></p>
+
+  </div>
+
+  <footer>
+    <ul class="stats">
+  <li class="categories">
+    <ul>
+        
+            
+            
+                <i class="fa fa-folder"></i>
+                
+                
+                <li><a class="article-category-link" href="/categories/kafka">kafka</a></li>
+                
+            
+        
+    </ul>
+  </li>
+  <li class="tags">
+    <ul>
+        
+    </ul>
+  </li>
+</ul>
+
+  </footer>
+
+</article>
+
+    <article class="post">
+        <div id="disqus_thread"></div>
+<script type="application/javascript">
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "shortname" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    </article>
+
+
+<ul class="actions pagination">
+    
+        <li><a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/"
+                class="button big previous">增加俩php5.2.17的.gdbinit方法</a></li>
+    
+
+    
+        <li><a href="/blog/redis-serializer/"
+                class="button big next">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a></li>
+    
+</ul>
+
+
+    </div>
+    
+<section id="sidebar">
+
+  
+  <section id="intro">
+    
+    
+      
+        <a href='/' class="logo"><img src="/img/main/logo.jpg" alt="Hugo Future Imperfect" /></a>
+      
+    
+    
+      <header>
+        <h2>yufulou的楼</h2>
+        <p>try deep, try more</p>
+      </header>
+    
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+  </section>
+
+  
+  <section class="recent-posts">
+    <div class="mini-posts">
+      <header>
+        <h3>Recent Posts</h3>
+      </header>
+      <div class="posts-container">
+        
+
+        
+          
+        
+
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-07'>
+                January 7, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-04'>
+                January 4, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a>
+              </h3>
+              
+              <time class="published" datetime='2020-11-22'>
+                November 22, 2020
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a>
+              </h3>
+              
+              <time class="published" datetime='2018-10-31'>
+                October 31, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a>
+              </h3>
+              
+              <time class="published" datetime='2018-09-29'>
+                September 29, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+      </div>
+
+      
+        <a href=
+          
+            /blog/
+          
+        class="button">View more posts</a>
+      
+    </div>
+  </section>
+
+  
+  
+  
+  
+  
+    <section id="categories">
+      <header>
+        <h3>
+          <a href="/categories/">Categories</a>
+        </h3>
+      </header>
+        
+          
+        
+
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/php/">php</a>
+                <span style="float:right;">7</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mysql/">mysql</a>
+                <span style="float:right;">5</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                Uncategorized
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/linux/">linux</a>
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/js/">js</a>
+                <span style="float:right;">3</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/apache/">apache</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/jackson/">jackson</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/java/">java</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/kafka/">kafka</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/lvs/">lvs</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mongo/">mongo</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/op/">op</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/redis/">redis</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/serialize/">serialize</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/sql/">sql</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+    </section>
+  
+  
+
+  
+  
+    <section id="mini-bio">
+      <h3>About</h3>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent tellus lacus, auctor vehicula molestie quis, tempor quis velit. Quisque in quam ac leo efficitur vulputate. Phasellus ullamcorper aliquam sodales. Maecenas sit amet condimentum ipsum. Proin sit amet ligula elit. Mauris.</p>
+      <a href="/about/" class="button">Learn More</a>
+    </section>
+  
+
+  
+  <section id="footer">
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+    <p class="copyright">
+      
+        &copy; 2021
+        
+          yufulou&#39;s 
+        
+      .
+      Powered by <a href="//gohugo.io" target="_blank">Hugo</a>
+    </p>
+  </section>
+</section>
+
+    </div>
+    <a id="back-to-top" href="#" class="fa fa-arrow-up fa-border fa-2x"></a>
+    
+
+    
+      
+    
+
+    
+      
+      
+      
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/highlight.min.js"></script>
+        
+        
+        
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/r.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/yaml.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/css.min.js"></script>
+        <script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+      
+    
+    
+    
+      <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/skel/3.0.1/skel.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.js"></script>
+      <script src="/js/util.js"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/backToTop.js"></script>
+    
+
+    
+      
+        
+      
+    
+
+    
+    <script>hljs.initHighlightingOnLoad();</script>
+      <script src="//yihui.name/js/math-code.js"></script>
+<script async
+src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+
+  </body>
+</html>
+

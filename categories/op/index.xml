@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>op on yufulou&#39;s </title>
+    <link>/categories/op/</link>
+    <description>Recent content in op on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Tue, 19 Aug 2014 11:29:08 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/op/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>VMware装mac虚拟机时候需要注意的</title>
+      <link>/blog/mac-system-in-vm/</link>
+      <pubDate>Tue, 19 Aug 2014 11:29:08 +0800</pubDate>
+      
+      <guid>/blog/mac-system-in-vm/</guid>
+      <description>1、要是开机出磁盘。。。unsuccessful什么的，打开vmx文件，删了efi那一行（换个iso后来就没这事了） 2、要是就卡在读磁盘读不出来那块了，有两种可能。a、iso有问题，b、做虚拟机时候，需要磁盘文件是一个文件，不能分到多个文件（可能需要打开显示器的3D加速） 3、装好以后，把cd启动盘换成darwin.iso</description>
+    </item>
+    
+  </channel>
+</rss>

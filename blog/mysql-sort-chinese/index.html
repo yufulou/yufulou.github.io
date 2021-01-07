@@ -1,0 +1,1375 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <script type="application/ld+json">
+    {
+        "@context" : "http://schema.org",
+        "@type" : "BlogPosting",
+        "mainEntityOfPage": {
+             "@type": "WebPage",
+             "@id": "\/"
+        },
+        "articleSection" : "blog",
+        "name" : "mysql utf8 中文字符 排序",
+        "headline" : "mysql utf8 中文字符 排序",
+        "description" : "最原始的帖子我打开不开，就贴这个地址吧： http:\/\/adriano.blogbus.com\/logs\/14278134.html\n跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？\n乘着放假，帮老大做个系统以减轻他的工作强度。\n用什么做，当然是ruby on rails\x2bmysql啦。\n又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。\n当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。\n这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。\n然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！\n解决的过程大致有四个阶段：\n一、首先当然是google和baidu,下面是被转载最多的文章，基本上用\x26quot;mysql 中文排序\x26quot;搜索，前n页都是对此的转载。提供了2种方法\n方法1，一种解决方法是对于包含中文的字段加上\x26quot;binary\x26quot;属性，使之作为二进制比较，例如将\x26quot;name char(10)\x26ldquo;改成\x26quot;name char(10)binary\x26rdquo;。方法2 ，如果你使用源码编译MySQL，可以编译MySQL时使用\x26ndash;with\x26ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。\n二、后来查到这个网页，使我有点绝望\nhttp:\/\/www.5ivb.com\/Info\/68\/3390242\/\n我研究了一下，初步了解：用二进制 binary 排序的前提是把 gbk\/gb2312 的汉字编码以 utf-8 的格式存进去，所以一个汉字被保存成 4 个字节，而不是真正的 3 个字节。如果数据库中真的以 utf-8 的字符集保存，则二进制 binary 排序会得出错误结果（非拼音排序）。另外，以 utf-8 保存 gbk\/gb2312 的编码会带来 char_length() 错误的问题。基本有结果了，看了 mysql 的文档后，明白了直接的排序办法没有！ 让我们期待 utf8_chinese_ci 的发布。 在这之前只能考虑间接的办法了。三、于是开始决定放弃utf8，修改为gbk或者gb2312\n查看了若干网页，试验若干次，终于发现一下几点：\n1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)\n2、要将我做好的系统整个改成gb2312，需要做以下的事情：\na.将所有的ruby文件改回ansi。\nb.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。\nc.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml\nadapter: mysql\ndatabase:\nusername: root\npassword:\nhost:\nencoding: gb2312",
+        "inLanguage" : "en",
+        "author" : "",
+        "creator" : "",
+        "publisher": "",
+        "accountablePerson" : "",
+        "copyrightHolder" : "",
+        "copyrightYear" : "2012",
+        "datePublished": "2012-02-04 22:05:27 \x2b0800 \x2b0800",
+        "dateModified" : "2012-02-04 22:05:27 \x2b0800 \x2b0800",
+        "url" : "\/blog\/mysql-sort-chinese\/",
+        "wordCount" : "245",
+        "keywords" : [ "Blog" ]
+    }
+    </script>
+        
+            
+                <title>mysql utf8 中文字符 排序</title>
+            
+        
+
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="generator" content="Hugo 0.60.1" />
+        
+
+
+        
+        
+            
+                <meta name="description" content="HTML5 UP theme, Future Imperfect with some extra goodies, ported by Julio Pescador. Powered by Hugo">
+            
+        
+
+        <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="mysql utf8 中文字符 排序"/>
+<meta name="twitter:description" content="最原始的帖子我打开不开，就贴这个地址吧： http://adriano.blogbus.com/logs/14278134.html
+跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？
+乘着放假，帮老大做个系统以减轻他的工作强度。
+用什么做，当然是ruby on rails&#43;mysql啦。
+又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。
+当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。
+这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。
+然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！
+解决的过程大致有四个阶段：
+一、首先当然是google和baidu,下面是被转载最多的文章，基本上用&quot;mysql 中文排序&quot;搜索，前n页都是对此的转载。提供了2种方法
+方法1，一种解决方法是对于包含中文的字段加上&quot;binary&quot;属性，使之作为二进制比较，例如将&quot;name char(10)&ldquo;改成&quot;name char(10)binary&rdquo;。方法2 ，如果你使用源码编译MySQL，可以编译MySQL时使用&ndash;with&ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。
+二、后来查到这个网页，使我有点绝望
+http://www.5ivb.com/Info/68/3390242/
+我研究了一下，初步了解：用二进制 binary 排序的前提是把 gbk/gb2312 的汉字编码以 utf-8 的格式存进去，所以一个汉字被保存成 4 个字节，而不是真正的 3 个字节。如果数据库中真的以 utf-8 的字符集保存，则二进制 binary 排序会得出错误结果（非拼音排序）。另外，以 utf-8 保存 gbk/gb2312 的编码会带来 char_length() 错误的问题。基本有结果了，看了 mysql 的文档后，明白了直接的排序办法没有！ 让我们期待 utf8_chinese_ci 的发布。 在这之前只能考虑间接的办法了。三、于是开始决定放弃utf8，修改为gbk或者gb2312
+查看了若干网页，试验若干次，终于发现一下几点：
+1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)
+2、要将我做好的系统整个改成gb2312，需要做以下的事情：
+a.将所有的ruby文件改回ansi。
+b.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。
+c.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml
+adapter: mysql
+database:
+username: root
+password:
+host:
+encoding: gb2312"/>
+<meta name="twitter:site" content="@example"/>
+
+        <meta property="og:title" content="mysql utf8 中文字符 排序" />
+<meta property="og:description" content="最原始的帖子我打开不开，就贴这个地址吧： http://adriano.blogbus.com/logs/14278134.html
+跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？
+乘着放假，帮老大做个系统以减轻他的工作强度。
+用什么做，当然是ruby on rails&#43;mysql啦。
+又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。
+当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。
+这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。
+然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！
+解决的过程大致有四个阶段：
+一、首先当然是google和baidu,下面是被转载最多的文章，基本上用&quot;mysql 中文排序&quot;搜索，前n页都是对此的转载。提供了2种方法
+方法1，一种解决方法是对于包含中文的字段加上&quot;binary&quot;属性，使之作为二进制比较，例如将&quot;name char(10)&ldquo;改成&quot;name char(10)binary&rdquo;。方法2 ，如果你使用源码编译MySQL，可以编译MySQL时使用&ndash;with&ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。
+二、后来查到这个网页，使我有点绝望
+http://www.5ivb.com/Info/68/3390242/
+我研究了一下，初步了解：用二进制 binary 排序的前提是把 gbk/gb2312 的汉字编码以 utf-8 的格式存进去，所以一个汉字被保存成 4 个字节，而不是真正的 3 个字节。如果数据库中真的以 utf-8 的字符集保存，则二进制 binary 排序会得出错误结果（非拼音排序）。另外，以 utf-8 保存 gbk/gb2312 的编码会带来 char_length() 错误的问题。基本有结果了，看了 mysql 的文档后，明白了直接的排序办法没有！ 让我们期待 utf8_chinese_ci 的发布。 在这之前只能考虑间接的办法了。三、于是开始决定放弃utf8，修改为gbk或者gb2312
+查看了若干网页，试验若干次，终于发现一下几点：
+1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)
+2、要将我做好的系统整个改成gb2312，需要做以下的事情：
+a.将所有的ruby文件改回ansi。
+b.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。
+c.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml
+adapter: mysql
+database:
+username: root
+password:
+host:
+encoding: gb2312" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="/blog/mysql-sort-chinese/" />
+<meta property="article:published_time" content="2012-02-04T22:05:27+08:00" />
+<meta property="article:modified_time" content="2012-02-04T22:05:27+08:00" />
+
+        <meta property="og:image" content="//images/logo.png">
+        <meta property="og:image:type" content="image/png">
+        <meta property="og:image:width" content="512">
+        <meta property="og:image:height" content="512">
+        <meta itemprop="name" content="mysql utf8 中文字符 排序">
+<meta itemprop="description" content="最原始的帖子我打开不开，就贴这个地址吧： http://adriano.blogbus.com/logs/14278134.html
+跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？
+乘着放假，帮老大做个系统以减轻他的工作强度。
+用什么做，当然是ruby on rails&#43;mysql啦。
+又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。
+当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。
+这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。
+然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！
+解决的过程大致有四个阶段：
+一、首先当然是google和baidu,下面是被转载最多的文章，基本上用&quot;mysql 中文排序&quot;搜索，前n页都是对此的转载。提供了2种方法
+方法1，一种解决方法是对于包含中文的字段加上&quot;binary&quot;属性，使之作为二进制比较，例如将&quot;name char(10)&ldquo;改成&quot;name char(10)binary&rdquo;。方法2 ，如果你使用源码编译MySQL，可以编译MySQL时使用&ndash;with&ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。
+二、后来查到这个网页，使我有点绝望
+http://www.5ivb.com/Info/68/3390242/
+我研究了一下，初步了解：用二进制 binary 排序的前提是把 gbk/gb2312 的汉字编码以 utf-8 的格式存进去，所以一个汉字被保存成 4 个字节，而不是真正的 3 个字节。如果数据库中真的以 utf-8 的字符集保存，则二进制 binary 排序会得出错误结果（非拼音排序）。另外，以 utf-8 保存 gbk/gb2312 的编码会带来 char_length() 错误的问题。基本有结果了，看了 mysql 的文档后，明白了直接的排序办法没有！ 让我们期待 utf8_chinese_ci 的发布。 在这之前只能考虑间接的办法了。三、于是开始决定放弃utf8，修改为gbk或者gb2312
+查看了若干网页，试验若干次，终于发现一下几点：
+1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)
+2、要将我做好的系统整个改成gb2312，需要做以下的事情：
+a.将所有的ruby文件改回ansi。
+b.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。
+c.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml
+adapter: mysql
+database:
+username: root
+password:
+host:
+encoding: gb2312">
+<meta itemprop="datePublished" content="2012-02-04T22:05:27&#43;08:00" />
+<meta itemprop="dateModified" content="2012-02-04T22:05:27&#43;08:00" />
+<meta itemprop="wordCount" content="245">
+
+
+
+<meta itemprop="keywords" content="" />
+        
+
+        
+            
+        
+
+        
+        
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/atom-one-light.min.css">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:400,800,900|Source+Sans+Pro:400,700">
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.css">
+            <link rel="stylesheet" href="/css/main.css">
+            <link rel="stylesheet" href="/css/add-on.css">
+            <link rel="stylesheet" href="/css/academicons.min.css">
+        
+
+        
+            
+                
+            
+        
+
+
+  
+    
+    <link href='//cdn.bootcss.com/highlight.js/9.11.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+  
+
+
+      
+    </head>
+    <body>
+
+      
+      <div id="wrapper">
+
+    
+    
+<header id="header">
+    
+      <h1><a href="/">blog</a></h1>
+    
+
+    <nav class="links">
+        <ul>
+            
+                <li>
+                    <a href="/">
+                            <i class="fa fa-home">&nbsp;</i>Home
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/about/">
+                            <i class="fa fa-id-card-o">&nbsp;</i>About
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/blog/">
+                            <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/itemized/">
+                            <i class="fa fa-list">&nbsp;</i>Itemized
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/categories/">
+                            <i class="fa fa-sitemap">&nbsp;</i>Categories
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/contact/">
+                            <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                    </a>
+                </li>
+            
+        </ul>
+    </nav>
+    <nav class="main">
+        <ul>
+            
+            <li id="share-nav" class="share-menu" style="display:none;">
+                <a class="fa-share-alt" href="#share-menu">Share</a>
+            </li>
+            
+            <li class="search">
+                <a class="fa-search" href="#search">Search</a>
+                <form id="search" method="get" action="//google.com/search">
+                    <input type="text" name="q" placeholder="Search" />
+                    <input type="hidden" name="as_sitesearch" value="/">
+                </form>
+            </li>
+            <li class="menu">
+                <a class="fa-bars" href="#menu">Menu</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+
+
+<section id="menu">
+
+    
+        <section>
+            <form class="search" method="get" action="//google.com/search">
+                <input type="text" name="q" placeholder="Search" />
+                <input type="hidden" name="as_sitesearch" value="/">
+            </form>
+        </section>
+
+    
+        <section>
+            <ul class="links">
+                
+                    <li>
+                        <a href="/">
+                            <h3>
+                                <i class="fa fa-home">&nbsp;</i>Home
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/about/">
+                            <h3>
+                                <i class="fa fa-id-card-o">&nbsp;</i>About
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/blog/">
+                            <h3>
+                                <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/itemized/">
+                            <h3>
+                                <i class="fa fa-list">&nbsp;</i>Itemized
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/categories/">
+                            <h3>
+                                <i class="fa fa-sitemap">&nbsp;</i>Categories
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/contact/">
+                            <h3>
+                                <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                            </h3>
+                        </a>
+                    </li>
+                
+            </ul>
+        </section>
+
+    
+        <section class="recent-posts">
+            <div class="mini-posts">
+                <header>
+                    <h3>Recent Posts</h3>
+                </header>
+                
+
+                
+                    
+                
+
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-07'>
+                                    January 7, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-04'>
+                                    January 4, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2020-11-22'>
+                                    November 22, 2020</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-10-31'>
+                                    October 31, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-09-29'>
+                                    September 29, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+
+                
+                    <a href=
+                        
+                            /blog/
+                        
+                        class="button">View more posts</a>
+                
+            </div>
+        </section>
+
+    
+        
+</section>
+
+    <section id="share-menu">
+    <section id="social-share-nav">
+        <ul class="links">
+            <header>
+                <h3>Share this post <i class="fa fa-smile-o"></i></h3>
+            </header>
+            
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fmysql-sort-chinese%2f&amp;text=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fmysql-sort-chinese%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fmysql-sort-chinese%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fmysql-sort-chinese%2f&amp;title=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fmysql-sort-chinese%2f&amp;title=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fmysql-sort-chinese%2f&amp;title=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fmysql-sort-chinese%2f&amp;description=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fmysql-sort-chinese%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+        </ul>
+    </section>
+</section>
+
+    
+    <div id="main">
+        
+        
+        <article class="post">
+  <header>
+    <div class="title">
+        
+            <h1><a href="/blog/mysql-sort-chinese/">mysql utf8 中文字符 排序</a></h1>
+            
+        
+        
+    </div>
+    <div class="meta">
+        
+
+        <time class="published"
+            datetime='2012-02-04'>
+            February 4, 2012</time>
+        <span class="author"></span>
+        
+            <p>2 minute read</p>
+        
+        
+    </div>
+</header>
+
+
+  
+    <section id="social-share">
+      <ul class="icons">
+        
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fmysql-sort-chinese%2f&amp;text=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fmysql-sort-chinese%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fmysql-sort-chinese%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fmysql-sort-chinese%2f&amp;title=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fmysql-sort-chinese%2f&amp;title=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fmysql-sort-chinese%2f&amp;title=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fmysql-sort-chinese%2f&amp;description=mysql%20utf8%20%e4%b8%ad%e6%96%87%e5%ad%97%e7%ac%a6%20%e6%8e%92%e5%ba%8f" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fmysql-sort-chinese%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+      </ul>
+    </section>
+  
+
+  
+
+  <div id="content">
+    <p>最原始的帖子我打开不开，就贴这个地址吧：
+<a href="http://adriano.blogbus.com/logs/14278134.html">http://adriano.blogbus.com/logs/14278134.html</a></p>
+<p>跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？</p>
+<p>乘着放假，帮老大做个系统以减轻他的工作强度。</p>
+<p>用什么做，当然是ruby on rails+mysql啦。</p>
+<p>又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。</p>
+<p>当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。</p>
+<p>这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。</p>
+<p>然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！</p>
+<p>解决的过程大致有四个阶段：</p>
+<p>一、首先当然是google和baidu,下面是被转载最多的文章，基本上用&quot;mysql 中文排序&quot;搜索，前n页都是对此的转载。提供了2种方法</p>
+<p><!-- raw HTML omitted -->方法1，一种解决方法是对于包含中文的字段加上&quot;binary&quot;属性，使之作为二进制比较，例如将&quot;name char(10)&ldquo;改成&quot;name char(10)binary&rdquo;。<!-- raw HTML omitted --></p>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --> 方法2 ，<!-- raw HTML omitted -->如果你使用源码编译MySQL，可以编译MySQL时使用&ndash;with&ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。<!-- raw HTML omitted --></p>
+<p>这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。</p>
+<p>二、后来查到这个网页，使我有点绝望</p>
+<p><a href="http://www.5ivb.com/Info/68/3390242/">http://www.5ivb.com/Info/68/3390242/</a></p>
+<p><!-- raw HTML omitted -->我研究了一下，初步了解：用二进制  binary  排序的前提是把  gbk/gb2312  的汉字编码以  utf-8  的格式存进去，所以一个汉字被保存成  4  个字节，而不是真正的  3  个字节。如果数据库中真的以  utf-8  的字符集保存，则二进制  binary  排序会得出错误结果（非拼音排序）。另外，以  utf-8  保存  gbk/gb2312  的编码会带来  char_length()  错误的问题。<!-- raw HTML omitted --></p>
+<p><!-- raw HTML omitted -->基本有结果了，看了  mysql  的文档后，明白了直接的排序办法没有！  <!-- raw HTML omitted -->  让我们期待  utf8_chinese_ci  的发布。  <!-- raw HTML omitted -->  在这之前只能考虑间接的办法了。<!-- raw HTML omitted --></p>
+<p>三、于是开始决定放弃utf8，修改为gbk或者gb2312</p>
+<p>查看了若干网页，试验若干次，终于发现一下几点：</p>
+<p>1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)</p>
+<p>2、要将我做好的系统整个改成gb2312，需要做以下的事情：</p>
+<p>a.将所有的ruby文件改回ansi。</p>
+<p>b.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。</p>
+<p>c.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml</p>
+<p>adapter: mysql<br>
+database:<br>
+username: root<br>
+password:<br>
+host:<br>
+encoding: gb2312</p>
+<p>d.上面已经将整个过程中可能配置的编码方式都修改为了gb2312，但是还有重要的最后一点，就是在网页中，输入中文的时候，必须当时网页是采用gb2312显示的，此时你输入进去的字符才是gb2312，否则在后来的显示就会出现乱码。</p>
+<p>当然上述的过程中也许有些设置可以不需要，比如，也许只要设置字段的编码和排序方式即可。未加尝试。总之，过程过于复杂，因而我也放弃了这样的想法。当然许多刚刚开始做系统的人当然可以一试。</p>
+<p>四、那么对于我的系统，我该怎么办呢？</p>
+<p>1、认真地研读了mysql5的文档。看到了mysql的解决方案，那就是convert()函数和cast()函数，一一试来。</p>
+<p>@test = Province.find_by_sql(&ldquo;select *, cast( prov_name as CHAR character set gb2312) collate gb2312_chinese_ci as ordername  from provinces order by ordername desc&rdquo;)</p>
+<p>结果，不行，还是原来的奇怪样子。修改为使用convert函数</p>
+<p>@test = Province.find_by_sql(&ldquo;select *, convert( prov_name using gb2312) as ordername  from provinces order by ordername desc&rdquo;)</p>
+<p>还是一样。原因至今不明</p>
+<p>2、最后，决定从ruby下手，查询的结果ruby会放在数组之中，每个数组元素是哈希表形式的一条记录。将查询的结果以新的方式重新排序不就可以了吗？</p>
+<p>幸好我们有可爱的iconv。(注意有时候安装ruby时可能没有安装iconv，需要额外安装一下)。这是个负责在字符集间进行转换的函数库。如果要使用它，还需要在controller中加上 require &lsquo;iconv&rsquo;</p>
+<p>下面就是我的实现，当然也实验了多次，查看了半天ruby的文档才得到的结果</p>
+<p>conv = Iconv.new(&ldquo;GBK&rdquo;, &ldquo;utf-8&rdquo;)</p>
+<p>ordername  from provinces order by ordername desc&rdquo;)<br>
+@test1 = Province.find(:all).sort {|x, y| conv.iconv(x.prov_name) &lt;=&gt; conv.iconv(y.prov_name)}</p>
+<p>它会按照省名的gbk字符进行排序，但是并不会修改其中的内容，也就是说显示时仍然是utf8格式。</p>
+<p>终于搞定了，我也终于写完了，当然这过程我明白了许多其中的机制，字符集是复杂的问题。我会再写一篇来完成的写我的心得。下一篇吧。</p>
+<p>这个第二个方法貌似靠谱的样子：</p>
+<p>转自：http://www.024zq.com/?p=98</p>
+<p>mysql 中文拼音排序</p>
+<p>2011-10-09</p>
+<p>客服那边需要我对一些酒店进行中文拼音排序，以前没有接触过，在php群里问了一些大牛。。得到了2种答案，都可以。哈哈·~<br>
+以下既是msyql 例子<br>
+表结构是utf-8的</p>
+<ol>
+<li></li>
+</ol>
+<ol>
+<li>
+<p>SELECT <code>hotel_name</code></p>
+</li>
+<li>
+<p>FROM <code>hotel_base</code></p>
+</li>
+<li>
+<p>ORDER BY convert( <code>hotel_name</code></p>
+</li>
+<li>
+<p>USING gbk )</p>
+</li>
+<li>
+<p>COLLATE gbk_chinese_ci</p>
+</li>
+<li></li>
+<li>
+<p>SELECT <code>hotel_id</code> , <code>hotel_name</code> , ELT( INTERVAL( CONV( HEX( left( CONVERT( <code>hotel_name</code></p>
+</li>
+<li>
+<p>USING gbk ) , 1 ) ) , 16, 10 ) , 0xB0A1, 0xB0C5, 0xB2C1, 0xB4EE, 0xB6EA, 0xB7A2, 0xB8C1, 0xB9FE, 0xBBF7, 0xBFA6, 0xC0AC, 0xC2E8, 0xC4C3, 0xC5B6, 0xC5BE, 0xC6DA, 0xC8BB, 0xC8F6, 0xCBFA, 0xCDDA, 0xCEF4, 0xD1B9, 0xD4D1 ) , ‘A’, ‘B’, ‘C’, ‘D’, ‘E’, ‘F’, ‘G’, ‘H’, ‘J’, ‘K’, ‘L’, ‘M’, ‘N’, ‘O’, ‘P’, ‘Q’, ‘R’, ‘S’, ‘T’, ‘W’, ‘X’, ‘Y’, ‘Z’ ) AS PY</p>
+</li>
+<li>
+<p>FROM hotel_base</p>
+</li>
+<li>
+<p>ORDER BY PY ASC</p>
+</li>
+</ol>
+<p>方法一较方法二简单些 呵呵 希望对迷惑的人有帮助~~~</p>
+
+  </div>
+
+  <footer>
+    <ul class="stats">
+  <li class="categories">
+    <ul>
+        
+            
+            
+                <i class="fa fa-folder"></i>
+                
+                
+                <li><a class="article-category-link" href="/categories/mysql">mysql</a></li>
+                
+            
+        
+    </ul>
+  </li>
+  <li class="tags">
+    <ul>
+        
+    </ul>
+  </li>
+</ul>
+
+  </footer>
+
+</article>
+
+    <article class="post">
+        <div id="disqus_thread"></div>
+<script type="application/javascript">
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "shortname" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    </article>
+
+
+<ul class="actions pagination">
+    
+        <li><a href="/blog/smtp-script/"
+                class="button big previous">一个通过smtp发送邮件的shell，带用户名密码</a></li>
+    
+
+    
+        <li><a href="/blog/replace-return-in-procedure/"
+                class="button big next">在procedure中代替return的方法</a></li>
+    
+</ul>
+
+
+    </div>
+    
+<section id="sidebar">
+
+  
+  <section id="intro">
+    
+    
+      
+        <a href='/' class="logo"><img src="/img/main/logo.jpg" alt="Hugo Future Imperfect" /></a>
+      
+    
+    
+      <header>
+        <h2>yufulou的楼</h2>
+        <p>try deep, try more</p>
+      </header>
+    
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+  </section>
+
+  
+  <section class="recent-posts">
+    <div class="mini-posts">
+      <header>
+        <h3>Recent Posts</h3>
+      </header>
+      <div class="posts-container">
+        
+
+        
+          
+        
+
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-07'>
+                January 7, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-04'>
+                January 4, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a>
+              </h3>
+              
+              <time class="published" datetime='2020-11-22'>
+                November 22, 2020
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a>
+              </h3>
+              
+              <time class="published" datetime='2018-10-31'>
+                October 31, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a>
+              </h3>
+              
+              <time class="published" datetime='2018-09-29'>
+                September 29, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+      </div>
+
+      
+        <a href=
+          
+            /blog/
+          
+        class="button">View more posts</a>
+      
+    </div>
+  </section>
+
+  
+  
+  
+  
+  
+    <section id="categories">
+      <header>
+        <h3>
+          <a href="/categories/">Categories</a>
+        </h3>
+      </header>
+        
+          
+        
+
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/php/">php</a>
+                <span style="float:right;">7</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mysql/">mysql</a>
+                <span style="float:right;">5</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                Uncategorized
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/linux/">linux</a>
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/js/">js</a>
+                <span style="float:right;">3</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/apache/">apache</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/jackson/">jackson</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/java/">java</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/kafka/">kafka</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/lvs/">lvs</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mongo/">mongo</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/op/">op</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/redis/">redis</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/serialize/">serialize</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/sql/">sql</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+    </section>
+  
+  
+
+  
+  
+    <section id="mini-bio">
+      <h3>About</h3>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent tellus lacus, auctor vehicula molestie quis, tempor quis velit. Quisque in quam ac leo efficitur vulputate. Phasellus ullamcorper aliquam sodales. Maecenas sit amet condimentum ipsum. Proin sit amet ligula elit. Mauris.</p>
+      <a href="/about/" class="button">Learn More</a>
+    </section>
+  
+
+  
+  <section id="footer">
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+    <p class="copyright">
+      
+        &copy; 2021
+        
+          yufulou&#39;s 
+        
+      .
+      Powered by <a href="//gohugo.io" target="_blank">Hugo</a>
+    </p>
+  </section>
+</section>
+
+    </div>
+    <a id="back-to-top" href="#" class="fa fa-arrow-up fa-border fa-2x"></a>
+    
+
+    
+      
+    
+
+    
+      
+      
+      
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/highlight.min.js"></script>
+        
+        
+        
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/r.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/yaml.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/css.min.js"></script>
+        <script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+      
+    
+    
+    
+      <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/skel/3.0.1/skel.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.js"></script>
+      <script src="/js/util.js"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/backToTop.js"></script>
+    
+
+    
+      
+        
+      
+    
+
+    
+    <script>hljs.initHighlightingOnLoad();</script>
+      <script src="//yihui.name/js/math-code.js"></script>
+<script async
+src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+
+  </body>
+</html>
+

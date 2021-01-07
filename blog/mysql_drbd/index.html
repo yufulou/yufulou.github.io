@@ -1,0 +1,1456 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <script type="application/ld+json">
+    {
+        "@context" : "http://schema.org",
+        "@type" : "BlogPosting",
+        "mainEntityOfPage": {
+             "@type": "WebPage",
+             "@id": "\/"
+        },
+        "articleSection" : "blog",
+        "name" : "redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）",
+        "headline" : "redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）",
+        "description" : "参考：http:\/\/www.boobooke.com\/bbs\/thread-47791-1-1.html（Heartbeat Drbd Mysql 构建高可用的MYSQL数据库服务）\nredhat1(master):172.31.1.73\nredhat2(slave):172.31.1.71\nVIP:172.31.1.77\n一、准备工作\n1、保证有未格式化的，或者未分区的磁盘空间\n2、修改两机hostname：\n1）两机修改：\/etc\/hosts文件，加入如下2行（使服务器可通过别名访问）\n172.31.1.71 slave\n172.31.1.73 master\n2）两机修改: \/etc\/sysconfig\/network，把HOSTNAME改为master或者slave\n3）两机执行：hostname master 或者 hostname slave\n4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确\n3、更新源并yum update\n4、安装mysql（我安装的是64位的二进制版），不设置开机启动\n二、安装并配置drbd\n1、两机执行：yum -y install drbd83 kmod-drbd83\n安装后，执行lsmod | grep drbd\n有类似如下显示，则证明安装成功\ndrbd 228528 3\n如果发现正常安装无法加载drbd模块，则要通过\x26quot;uname -a\x26quot;检查系统是否处于xen内核模式下，如果是，修改\/boot\/grub\/grub.conf，修改默认启动内核为不带\x26quot;xen\x26quot;版本的\n2、两机修改：\/etc\/drbd.conf\n \\# \\# please have a a look at the example configuration file in \\# \/usr\/share\/doc\/drbd83\/drbd.conf \\# global { usage-count yes; } common { syncer { rate 10M; } } resource r0{ protocol C; startup{ degr-wfc-timeout 120; } disk{ on-io-error detach; } net{ } syncer{ rate 10M; } on master{ device \/dev\/drbd0; disk \/dev\/vdb1; \/\/ 因情况而异 address 172.",
+        "inLanguage" : "en",
+        "author" : "",
+        "creator" : "",
+        "publisher": "",
+        "accountablePerson" : "",
+        "copyrightHolder" : "",
+        "copyrightYear" : "2011",
+        "datePublished": "2011-12-26 15:39:54 \x2b0800 \x2b0800",
+        "dateModified" : "2011-12-26 15:39:54 \x2b0800 \x2b0800",
+        "url" : "\/blog\/mysql_drbd\/",
+        "wordCount" : "429",
+        "keywords" : [ "Blog" ]
+    }
+    </script>
+        
+            
+                <title>redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）</title>
+            
+        
+
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="generator" content="Hugo 0.60.1" />
+        
+
+
+        
+        
+            
+                <meta name="description" content="HTML5 UP theme, Future Imperfect with some extra goodies, ported by Julio Pescador. Powered by Hugo">
+            
+        
+
+        <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）"/>
+<meta name="twitter:description" content="参考：http://www.boobooke.com/bbs/thread-47791-1-1.html（Heartbeat Drbd Mysql 构建高可用的MYSQL数据库服务）
+redhat1(master):172.31.1.73
+redhat2(slave):172.31.1.71
+VIP:172.31.1.77
+一、准备工作
+1、保证有未格式化的，或者未分区的磁盘空间
+2、修改两机hostname：
+1）两机修改：/etc/hosts文件，加入如下2行（使服务器可通过别名访问）
+172.31.1.71 slave
+172.31.1.73 master
+2）两机修改: /etc/sysconfig/network，把HOSTNAME改为master或者slave
+3）两机执行：hostname master 或者 hostname slave
+4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确
+3、更新源并yum update
+4、安装mysql（我安装的是64位的二进制版），不设置开机启动
+二、安装并配置drbd
+1、两机执行：yum -y install drbd83 kmod-drbd83
+安装后，执行lsmod | grep drbd
+有类似如下显示，则证明安装成功
+drbd 228528 3
+如果发现正常安装无法加载drbd模块，则要通过&quot;uname -a&quot;检查系统是否处于xen内核模式下，如果是，修改/boot/grub/grub.conf，修改默认启动内核为不带&quot;xen&quot;版本的
+2、两机修改：/etc/drbd.conf
+ \# \# please have a a look at the example configuration file in \# /usr/share/doc/drbd83/drbd.conf \# global { usage-count yes; } common { syncer { rate 10M; } } resource r0{ protocol C; startup{ degr-wfc-timeout 120; } disk{ on-io-error detach; } net{ } syncer{ rate 10M; } on master{ device /dev/drbd0; disk /dev/vdb1; // 因情况而异 address 172."/>
+<meta name="twitter:site" content="@example"/>
+
+        <meta property="og:title" content="redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）" />
+<meta property="og:description" content="参考：http://www.boobooke.com/bbs/thread-47791-1-1.html（Heartbeat Drbd Mysql 构建高可用的MYSQL数据库服务）
+redhat1(master):172.31.1.73
+redhat2(slave):172.31.1.71
+VIP:172.31.1.77
+一、准备工作
+1、保证有未格式化的，或者未分区的磁盘空间
+2、修改两机hostname：
+1）两机修改：/etc/hosts文件，加入如下2行（使服务器可通过别名访问）
+172.31.1.71 slave
+172.31.1.73 master
+2）两机修改: /etc/sysconfig/network，把HOSTNAME改为master或者slave
+3）两机执行：hostname master 或者 hostname slave
+4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确
+3、更新源并yum update
+4、安装mysql（我安装的是64位的二进制版），不设置开机启动
+二、安装并配置drbd
+1、两机执行：yum -y install drbd83 kmod-drbd83
+安装后，执行lsmod | grep drbd
+有类似如下显示，则证明安装成功
+drbd 228528 3
+如果发现正常安装无法加载drbd模块，则要通过&quot;uname -a&quot;检查系统是否处于xen内核模式下，如果是，修改/boot/grub/grub.conf，修改默认启动内核为不带&quot;xen&quot;版本的
+2、两机修改：/etc/drbd.conf
+ \# \# please have a a look at the example configuration file in \# /usr/share/doc/drbd83/drbd.conf \# global { usage-count yes; } common { syncer { rate 10M; } } resource r0{ protocol C; startup{ degr-wfc-timeout 120; } disk{ on-io-error detach; } net{ } syncer{ rate 10M; } on master{ device /dev/drbd0; disk /dev/vdb1; // 因情况而异 address 172." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="/blog/mysql_drbd/" />
+<meta property="article:published_time" content="2011-12-26T15:39:54+08:00" />
+<meta property="article:modified_time" content="2011-12-26T15:39:54+08:00" />
+
+        <meta property="og:image" content="//images/logo.png">
+        <meta property="og:image:type" content="image/png">
+        <meta property="og:image:width" content="512">
+        <meta property="og:image:height" content="512">
+        <meta itemprop="name" content="redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）">
+<meta itemprop="description" content="参考：http://www.boobooke.com/bbs/thread-47791-1-1.html（Heartbeat Drbd Mysql 构建高可用的MYSQL数据库服务）
+redhat1(master):172.31.1.73
+redhat2(slave):172.31.1.71
+VIP:172.31.1.77
+一、准备工作
+1、保证有未格式化的，或者未分区的磁盘空间
+2、修改两机hostname：
+1）两机修改：/etc/hosts文件，加入如下2行（使服务器可通过别名访问）
+172.31.1.71 slave
+172.31.1.73 master
+2）两机修改: /etc/sysconfig/network，把HOSTNAME改为master或者slave
+3）两机执行：hostname master 或者 hostname slave
+4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确
+3、更新源并yum update
+4、安装mysql（我安装的是64位的二进制版），不设置开机启动
+二、安装并配置drbd
+1、两机执行：yum -y install drbd83 kmod-drbd83
+安装后，执行lsmod | grep drbd
+有类似如下显示，则证明安装成功
+drbd 228528 3
+如果发现正常安装无法加载drbd模块，则要通过&quot;uname -a&quot;检查系统是否处于xen内核模式下，如果是，修改/boot/grub/grub.conf，修改默认启动内核为不带&quot;xen&quot;版本的
+2、两机修改：/etc/drbd.conf
+ \# \# please have a a look at the example configuration file in \# /usr/share/doc/drbd83/drbd.conf \# global { usage-count yes; } common { syncer { rate 10M; } } resource r0{ protocol C; startup{ degr-wfc-timeout 120; } disk{ on-io-error detach; } net{ } syncer{ rate 10M; } on master{ device /dev/drbd0; disk /dev/vdb1; // 因情况而异 address 172.">
+<meta itemprop="datePublished" content="2011-12-26T15:39:54&#43;08:00" />
+<meta itemprop="dateModified" content="2011-12-26T15:39:54&#43;08:00" />
+<meta itemprop="wordCount" content="429">
+
+
+
+<meta itemprop="keywords" content="" />
+        
+
+        
+            
+        
+
+        
+        
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/atom-one-light.min.css">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:400,800,900|Source+Sans+Pro:400,700">
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.css">
+            <link rel="stylesheet" href="/css/main.css">
+            <link rel="stylesheet" href="/css/add-on.css">
+            <link rel="stylesheet" href="/css/academicons.min.css">
+        
+
+        
+            
+                
+            
+        
+
+
+  
+    
+    <link href='//cdn.bootcss.com/highlight.js/9.11.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+  
+
+
+      
+    </head>
+    <body>
+
+      
+      <div id="wrapper">
+
+    
+    
+<header id="header">
+    
+      <h1><a href="/">blog</a></h1>
+    
+
+    <nav class="links">
+        <ul>
+            
+                <li>
+                    <a href="/">
+                            <i class="fa fa-home">&nbsp;</i>Home
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/about/">
+                            <i class="fa fa-id-card-o">&nbsp;</i>About
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/blog/">
+                            <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/itemized/">
+                            <i class="fa fa-list">&nbsp;</i>Itemized
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/categories/">
+                            <i class="fa fa-sitemap">&nbsp;</i>Categories
+                    </a>
+                </li>
+            
+                <li>
+                    <a href="/contact/">
+                            <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                    </a>
+                </li>
+            
+        </ul>
+    </nav>
+    <nav class="main">
+        <ul>
+            
+            <li id="share-nav" class="share-menu" style="display:none;">
+                <a class="fa-share-alt" href="#share-menu">Share</a>
+            </li>
+            
+            <li class="search">
+                <a class="fa-search" href="#search">Search</a>
+                <form id="search" method="get" action="//google.com/search">
+                    <input type="text" name="q" placeholder="Search" />
+                    <input type="hidden" name="as_sitesearch" value="/">
+                </form>
+            </li>
+            <li class="menu">
+                <a class="fa-bars" href="#menu">Menu</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+
+
+<section id="menu">
+
+    
+        <section>
+            <form class="search" method="get" action="//google.com/search">
+                <input type="text" name="q" placeholder="Search" />
+                <input type="hidden" name="as_sitesearch" value="/">
+            </form>
+        </section>
+
+    
+        <section>
+            <ul class="links">
+                
+                    <li>
+                        <a href="/">
+                            <h3>
+                                <i class="fa fa-home">&nbsp;</i>Home
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/about/">
+                            <h3>
+                                <i class="fa fa-id-card-o">&nbsp;</i>About
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/blog/">
+                            <h3>
+                                <i class="fa fa-newspaper-o">&nbsp;</i>Blog
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/itemized/">
+                            <h3>
+                                <i class="fa fa-list">&nbsp;</i>Itemized
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/categories/">
+                            <h3>
+                                <i class="fa fa-sitemap">&nbsp;</i>Categories
+                            </h3>
+                        </a>
+                    </li>
+                
+                    <li>
+                        <a href="/contact/">
+                            <h3>
+                                <i class="fa fa-envelope-o">&nbsp;</i>Contact
+                            </h3>
+                        </a>
+                    </li>
+                
+            </ul>
+        </section>
+
+    
+        <section class="recent-posts">
+            <div class="mini-posts">
+                <header>
+                    <h3>Recent Posts</h3>
+                </header>
+                
+
+                
+                    
+                
+
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-07'>
+                                    January 7, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2021-01-04'>
+                                    January 4, 2021</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2020-11-22'>
+                                    November 22, 2020</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-10-31'>
+                                    October 31, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+                        <article class="mini-post">
+                            <header>
+                                <h3><a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a></h3>
+                                
+                                <time class="published" datetime=
+                                    '2018-09-29'>
+                                    September 29, 2018</time>
+                            </header>
+                            
+
+                        </article>
+                
+
+                
+                    <a href=
+                        
+                            /blog/
+                        
+                        class="button">View more posts</a>
+                
+            </div>
+        </section>
+
+    
+        
+</section>
+
+    <section id="share-menu">
+    <section id="social-share-nav">
+        <ul class="links">
+            <header>
+                <h3>Share this post <i class="fa fa-smile-o"></i></h3>
+            </header>
+            
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fmysql_drbd%2f&amp;text=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fmysql_drbd%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fmysql_drbd%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fmysql_drbd%2f&amp;title=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fmysql_drbd%2f&amp;title=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fmysql_drbd%2f&amp;title=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fmysql_drbd%2f&amp;description=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fmysql_drbd%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+        </ul>
+    </section>
+</section>
+
+    
+    <div id="main">
+        
+        
+        <article class="post">
+  <header>
+    <div class="title">
+        
+            <h1><a href="/blog/mysql_drbd/">redhat5.x86_64下搭建mysql drbd heartbeat做主从mysql高可用（mysql HA）</a></h1>
+            
+        
+        
+    </div>
+    <div class="meta">
+        
+
+        <time class="published"
+            datetime='2011-12-26'>
+            December 26, 2011</time>
+        <span class="author"></span>
+        
+            <p>3 minute read</p>
+        
+        
+    </div>
+</header>
+
+
+  
+    <section id="social-share">
+      <ul class="icons">
+        
+
+
+
+<li>
+  <a href="//twitter.com/share?url=%2fblog%2fmysql_drbd%2f&amp;text=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89&amp;via=example" target="_blank" class="share-btn twitter">
+    <i class="fa fa-twitter"></i>
+    <p>Twitter</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//plus.google.com/share?url=%2fblog%2fmysql_drbd%2f" target="_blank" class="share-btn google-plus">
+    <i class="fa fa-google-plus"></i>
+    <p>Google+</p>
+  </a>
+</li>
+
+
+
+
+
+<li>
+  <a href="//www.facebook.com/sharer/sharer.php?u=%2fblog%2fmysql_drbd%2f" target="_blank" class="share-btn facebook">
+    <i class="fa fa-facebook"></i>
+    <p>Facebook</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//reddit.com/submit?url=%2fblog%2fmysql_drbd%2f&amp;title=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn reddit">
+    <i class="fa fa-reddit-alien"></i>
+    <p>Reddit</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.linkedin.com/shareArticle?url=%2fblog%2fmysql_drbd%2f&amp;title=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn linkedin">
+      <i class="fa fa-linkedin"></i>
+      <p>LinkedIn</p>
+    </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.stumbleupon.com/submit?url=%2fblog%2fmysql_drbd%2f&amp;title=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn stumbleupon">
+    <i class="fa fa-stumbleupon"></i>
+    <p>StumbleUpon</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="//www.pinterest.com/pin/create/button/?url=%2fblog%2fmysql_drbd%2f&amp;description=redhat5.x86_64%e4%b8%8b%e6%90%ad%e5%bb%bamysql%20drbd%20heartbeat%e5%81%9a%e4%b8%bb%e4%bb%8emysql%e9%ab%98%e5%8f%af%e7%94%a8%ef%bc%88mysql%20HA%ef%bc%89" target="_blank" class="share-btn pinterest">
+    <i class="fa fa-pinterest-p"></i>
+    <p>Pinterest</p>
+  </a>
+</li>
+
+
+
+
+<li>
+  <a href="mailto:?subject=Check out this post by &amp;body=%2fblog%2fmysql_drbd%2f" target="_blank" class="share-btn email">
+    <i class="fa fa-envelope"></i>
+    <p>Email</p>
+  </a>
+</li>
+
+
+      </ul>
+    </section>
+  
+
+  
+
+  <div id="content">
+    <p>参考：http://www.boobooke.com/bbs/thread-47791-1-1.html（<!-- raw HTML omitted -->Heartbeat   Drbd  Mysql 构建高可用的MYSQL数据库服务<!-- raw HTML omitted -->）</p>
+<p>redhat1(master):172.31.1.73<br>
+redhat2(slave):172.31.1.71<br>
+VIP:172.31.1.77</p>
+<p><strong><!-- raw HTML omitted -->一、准备工作<!-- raw HTML omitted --></strong><br>
+1、保证有未格式化的，或者未分区的磁盘空间<br>
+2、修改两机hostname：<br>
+1）两机修改：/etc/hosts文件，加入如下2行（使服务器可通过别名访问）<br>
+172.31.1.71   slave<br>
+172.31.1.73   master<br>
+2）两机修改: /etc/sysconfig/network，把HOSTNAME改为master或者slave<br>
+3）两机执行：hostname master 或者 hostname slave<br>
+4）两机测试：ping master；ping slave，若都能ping通，则说明设置正确<br>
+3、更新源并yum update<br>
+4、安装mysql（我安装的是64位的二进制版），不设置开机启动</p>
+<p><strong><!-- raw HTML omitted -->二、安装并配置drbd<!-- raw HTML omitted --></strong><br>
+1、两机执行：yum -y install drbd83 kmod-drbd83<br>
+安装后，执行lsmod | grep drbd<br>
+有类似如下显示，则证明安装成功<br>
+drbd                  228528  3<br>
+如果发现正常安装无法加载drbd模块，则要通过&quot;uname -a&quot;检查系统是否处于xen内核模式下，如果是，修改/boot/grub/grub.conf，修改默认启动内核为不带&quot;xen&quot;版本的<br>
+2、两机修改：/etc/drbd.conf</p>
+<pre><code>   \#  
+   \# please have a a look at the example configuration file in  
+   \# /usr/share/doc/drbd83/drbd.conf  
+   \#  
+   global { usage-count yes; }  
+   common { syncer { rate 10M; } }  
+   resource r0{  
+    protocol C;  
+    startup{  
+           degr-wfc-timeout 120;  
+    }  
+    disk{  
+           on-io-error detach;  
+    }  
+    net{  
+    }  
+    syncer{  
+           rate 10M;  
+    }  
+    on master{  
+           device          /dev/drbd0;  
+           disk            /dev/vdb1; // 因情况而异  
+           address         172.31.1.73:7788;    
+           meta-disk       internal;  
+    }  
+    on slave{  
+           device          /dev/drbd0;  
+           disk            /dev/vdb1; // 因情况而异  
+           address         172.31.1.71:7788;  
+           meta-disk       internal;  
+    }  
+   }  
+  // 再创建一个资源，为二进制日志做准备  
+   resource r1{  
+    protocol C;  
+    startup{  
+           degr-wfc-timeout 120;  
+    }  
+    disk{  
+           on-io-error detach;  
+    }  
+    net{  
+    }  
+    syncer{  
+           rate 10M;  
+    }  
+    on master{  
+           device          /dev/drbd1;  
+           disk            /dev/vdb2; // 因情况而异  
+           address         172.31.1.73:7789; // 端口号需不同，否则报错    
+           meta-disk       internal;  
+    }  
+    on slave{  
+           device          /dev/drbd1;  
+           disk            /dev/vdb2; // 因情况而异  
+           address         172.31.1.71:7789; // 端口号需不同，否则报错   
+           meta-disk       internal;  
+    }  
+   }  
+</code></pre><p>3、两机执行：for i in $(seq 0 15) ; do mknod /dev/drbd$i b 147 $i ; done<br>
+建立设备文件，不过貌似有drbd0就够了，上面的语句会创建0-15<br>
+4、初始化meta-data area<br>
+两机执行drbdadm create-md r0, drbdadm create-md r1<br>
+如果这步出了error，很有可能是配置中指定的分区已经被格式化过，或曾经格式化过（我删除分区重建也不行），则执行：dd if=/dev/zero bs=1M count=1 of=/dev/vdb1; sync，然后重新执行drbdadm create-md r0, drbdadm create-md r1<br>
+5、两台主机执行：/etc/init.d/drbd start;<br>
+1）测试：netstat -ant | grep $PORT:7788，显示如下，则正确：<br>
+tcp     0   0 172.31.1.73:7788      0.0.0.0:*       ESTABLISHED<br>
+2）cat /proc/drbd，会发现如Secondary/Secondary字样，证明两台都是备机状态<br>
+3）在相当做主机的设备上执行：<br>
+drbdsetup /dev/drbd0 primary -o，drbdsetup /dev/drbd1 primary -o<br>
+cat /proc/drbd，则会发现正在执行同步，并且状态变为Primary/Secondary<br>
+6、同步完成后，则可开始对drbd分区任意格式化（从这里开始，一切对/dev/vdb1的操作，都变为对/dev/drbd0操作），如&quot;mkfs.ext3 /dev/drbd0&rdquo;，<br>
+然后可以&quot;mount /dev/drbd0 /home/Db/&quot;,&ldquo;mount /dev/drbd1 /home/log&rdquo;<br>
+7、可以开始测试，并写入/home/Db分区，在另一边看是否可以同步，在备机查看时，要先停掉drbd服务（service drbd stop），然后&quot;mount /dev/vdb1 /home/Db&rdquo;，看是否同步<br>
+8、两机主备切换命令：drbdadm secondary r0  ； drbdadm primary r0 ；前提是，要先把主机drbd停止或降级，然后备机升为primary<br>
+9、配置mysql数据目录为/home/Db/mysql</p>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted -->三、安装配置heartbeat<!-- raw HTML omitted --><!-- raw HTML omitted -->（均为两机执行）<br>
+1、yum install -y heartbeat(heartbeat可能需要安装2次，暂时是个神奇的问题……)<br>
+2、cp /usr/share/doc/heartbeat-2.1.3/haresources /etc/ha.d/<br>
+cp /usr/share/doc/heartbeat-2.1.3/ha.cf /etc/ha.d/<br>
+cp /usr/share/doc/heartbeat-2.1.3/authkeys /etc/ha.d/<br>
+chmod 600 /etc/ha.d/authkeys（注意，这里必须要为600，否则会报错）<br>
+3、vi /etc/ha.d/authkeys，去掉以下2行注释<br>
+auth 1<br>
+1 crc<br>
+4、vi /etc/ha.d/ha.cf，改后为</p>
+<pre><code>   \#grep -v &quot;^#&quot; /etc/ha.d/ha.cf  
+   debugfile /var/log/ha-debug  
+   logfile /var/log/ha-log  
+   logfacility     local0  
+   keepalive 2  
+   deadtime 10  
+   warntime 5  
+   initdead 120  
+   ucast eth0 172.31.1.71   # 互填对方ip，这里slave写172.31.1.73  
+
+   auto_failback off    # 恢复正常后是否需要再自动切换回来，一般都设为off。  
+   node    master  
+   node    slave  
+   ping 172.31.1.67  # 这里放一个两台服务器均应能ping通的第三方节点IP即可，目的是让服务器能自知与外界的连通性  
+   \# 指定和heartbeat一起启动、关闭的进程  
+   respawn hacluster /usr/lib64/heartbeat/ipfail   
+   apiauth ipfail gid=haclient uid=hacluster  
+</code></pre><p>5、vi /etc/ha.d/resource.d/mysqld_umount（设置heartbeat主从转换时执行的脚本）</p>
+<pre><code>   \#!/bin/bash  
+   unset LC_ALL; export LC_ALL  
+   unset LANGUAGE; export LANGUAGE  
+
+   prefix=/usr  
+   exec_prefix=/usr  
+   . /etc/ha.d/shellfuncs  
+
+   case &quot;$1&quot; in  
+   'start')  
+           drbdadm primary all  
+           mount /dev/drbd0 /home/Db  
+           mount /dev/drbd1 /home/log  
+           drbdadm connect all  
+   ;;  
+   'pre-start')  
+   ;;  
+   'post-start')  
+   ;;  
+   'stop')  
+           umount /dev/drbd1  
+           umount /dev/drbd0  
+           drbdadm secondary all  
+   ;;  
+   'pre-stop')  
+   ;;  
+   'post-stop')  
+   ;;  
+   \*)  
+           echo &quot;Usage: $0 { start | pre_start | post-start | stop | pre-stop |post-stop }&quot;  
+   ;;  
+
+   esac  
+   exit 0  
+</code></pre><p>6、chmod  x  /etc/ha.d/resource.d/mysqld_umount<br>
+7、vi /etc/ha.d/haresource 添加 &ldquo;master  IPaddr::172.31.1.77/24/eth0:1 mysqld_umount mysql&rdquo;<br>
+8、service heartbeat start，先启动master的heartbeat服务，然后启动slave的。<br>
+9、测试<br>
+10、设置drbd自动加载，但mysql不自动加载，heartbeat写在rc.local中，保证在drbd之后启动</p>
+<p><strong><!-- raw HTML omitted -->四、mysql二进制日志及redo日志设置<!-- raw HTML omitted --></strong>（摘自mysqlops朋友的“Mysql服务器端参数详解和优化建议.pdf”）<br>
+innodb_flush_log_at_trx_commit= N：<br>
+N=0 &ndash;每隔一秒，把事务日志缓存区的数据写到日志文件中，以及把日志文件的数据刷新到磁盘上；<br>
+N=1 –每个事务提交时候，把事务日志从缓存区写到日志文件中，并且刷新日志文件的数据到磁盘上；<br>
+N=2 –每事务提交的时候，把事务日志数据从缓存区写到日志文件中；每隔一秒，刷新一次日志文件，但不一定刷新到磁盘上，而是取决于操作系统的调度；<br>
+sync_binlog = N：<br>
+N&gt;0 &ndash;每向二进制日志文件写入N条SQL或N个事务后，则把二进制日志文件的数据刷新到磁盘上；<br>
+N=0 &ndash;不主动刷新二进制日志文件的数据到磁盘上，而是由操作系统决定；<br>
+推荐配置组合：<br>
+N=1,1 &mdash;适合数据安全性要求非常高，而且磁盘IO写能力足够支持业务，比如充值消费系统；<br>
+N=1,0 &mdash;适合数据安全性要求高，磁盘IO写能力支持业务不富余，允许备库落后或无复制；<br>
+N=2,0或2,m(0</p>
+<p>&lt;m&lt;100) &mdash;适合数据安全性有要求，允许丢失一点事务日志，复制架构的延迟也能接受；&lt;br=&quot;&ldquo;&gt;N=0,0 &mdash;磁盘IO写能力有限，无复制或允许复制延迟稍微长点能接受，例如：日志性登记业务&lt;/m&lt;100)&gt;</p>
+
+  </div>
+
+  <footer>
+    <ul class="stats">
+  <li class="categories">
+    <ul>
+        
+            
+            
+                <i class="fa fa-folder"></i>
+                
+                
+                <li><a class="article-category-link" href="/categories/linux">linux</a></li>
+                
+            
+        
+    </ul>
+  </li>
+  <li class="tags">
+    <ul>
+        
+    </ul>
+  </li>
+</ul>
+
+  </footer>
+
+</article>
+
+    <article class="post">
+        <div id="disqus_thread"></div>
+<script type="application/javascript">
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "shortname" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    </article>
+
+
+<ul class="actions pagination">
+    
+        <li><a href="/blog/lvson4vm/"
+                class="button big previous">【原】vmware上4台centos5.7.i386做2*LVS/DR(master backup) 2*realserver</a></li>
+    
+
+    
+        <li><a href="/blog/nfs-config/"
+                class="button big next">NFS文件系统配置，要注意一个小小问题，以及共享session的方法</a></li>
+    
+</ul>
+
+
+    </div>
+    
+<section id="sidebar">
+
+  
+  <section id="intro">
+    
+    
+      
+        <a href='/' class="logo"><img src="/img/main/logo.jpg" alt="Hugo Future Imperfect" /></a>
+      
+    
+    
+      <header>
+        <h2>yufulou的楼</h2>
+        <p>try deep, try more</p>
+      </header>
+    
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+  </section>
+
+  
+  <section class="recent-posts">
+    <div class="mini-posts">
+      <header>
+        <h3>Recent Posts</h3>
+      </header>
+      <div class="posts-container">
+        
+
+        
+          
+        
+
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/select-medium-number/">[转]在MySQL中，如何计算一组数据的中位数？</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-07'>
+                January 7, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-serializer/">jackson做redis反序列化时，反序列化Map&lt;Integer, T&gt;时的问题</a>
+              </h3>
+              
+              <time class="published" datetime='2021-01-04'>
+                January 4, 2021
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/kafka-rebalance-protocol/">【译】【原】kafka rebalance 协议详解</a>
+              </h3>
+              
+              <time class="published" datetime='2020-11-22'>
+                November 22, 2020
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/%E5%A2%9E%E5%8A%A0%E4%BF%A9php5-2-17%E7%9A%84gdbinit%E6%96%B9%E6%B3%95/">增加俩php5.2.17的.gdbinit方法</a>
+              </h3>
+              
+              <time class="published" datetime='2018-10-31'>
+                October 31, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+          <article class="mini-post">
+            <header>
+              <h3>
+                <a href="/blog/redis-fluctruate/">redis可能波动的几种情况</a>
+              </h3>
+              
+              <time class="published" datetime='2018-09-29'>
+                September 29, 2018
+              </time>
+            </header>
+            
+
+          </article>
+        
+      </div>
+
+      
+        <a href=
+          
+            /blog/
+          
+        class="button">View more posts</a>
+      
+    </div>
+  </section>
+
+  
+  
+  
+  
+  
+    <section id="categories">
+      <header>
+        <h3>
+          <a href="/categories/">Categories</a>
+        </h3>
+      </header>
+        
+          
+        
+
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/php/">php</a>
+                <span style="float:right;">7</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mysql/">mysql</a>
+                <span style="float:right;">5</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                Uncategorized
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/linux/">linux</a>
+                <span style="float:right;">4</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/js/">js</a>
+                <span style="float:right;">3</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/apache/">apache</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/jackson/">jackson</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/java/">java</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/kafka/">kafka</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/lvs/">lvs</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/mongo/">mongo</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/op/">op</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/redis/">redis</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/serialize/">serialize</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+        <p>
+          <article>
+            <header>
+              
+                <a href="/categories/sql/">sql</a>
+                <span style="float:right;">1</span>
+              
+            </header>
+          </article>
+        </p>
+        
+    </section>
+  
+  
+
+  
+  
+    <section id="mini-bio">
+      <h3>About</h3>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent tellus lacus, auctor vehicula molestie quis, tempor quis velit. Quisque in quam ac leo efficitur vulputate. Phasellus ullamcorper aliquam sodales. Maecenas sit amet condimentum ipsum. Proin sit amet ligula elit. Mauris.</p>
+      <a href="/about/" class="button">Learn More</a>
+    </section>
+  
+
+  
+  <section id="footer">
+    
+      <ul class="icons">
+        
+          
+    <li><a href="/index.xml" type="application/rss+xml" target="_blank" title="RSS" class="fa fa-rss"></a></li>
+
+
+        
+        
+  <li><a href="//github.com/jpescador/hugo-future-imperfect" target="_blank" title="GitHub" class="fa fa-github"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//flickr.com/photos/example" target="_blank" title="Flickr" class="fa fa-flickr"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//linkedin.com/in/example" target="_blank" title="LinkedIn" class="fa fa-linkedin"></a></li>
+
+
+
+  <li><a href="//linkedin.com/company/examplebusiness" target="_blank" title="LinkedIn Company" class="fa fa-linkedin"></a></li>
+
+
+
+
+
+
+
+
+
+  <li><a href="//facebook.com/example" target="_blank" title="Facebook" class="fa fa-facebook"></a></li>
+
+
+
+
+
+  <li><a href="//reddit.com/user/example" target="_blank" title="Reddit" class="fa fa-reddit"></a></li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <li><a href="//instagram.com/example" target="_blank" title="Instagram" class="fa fa-instagram"></a></li>
+
+
+
+
+
+  <li><a href="//twitter.com/example" target="_blank" title="Twitter" class="fa fa-twitter"></a></li>
+
+
+
+
+
+
+
+  <li><a href="//pinterest.com/example" target="_blank" title="Pinterest" class="fa fa-pinterest-p"></a></li>
+
+
+
+  <li><a href="//telegram.me/example" target="_blank" title="telegram" class="fa fa-telegram"></a></li>
+
+
+
+
+
+
+
+
+
+<li><a href="//researchgate.net/profile/example" target="_blank" title="Research Gate"><i class="ai ai-researchgate"></i></a></li>
+
+
+
+  <li><a href="mailto:example" title="Email" class="fa fa-envelope"></a></li>
+
+
+      </ul>
+    
+    <p class="copyright">
+      
+        &copy; 2021
+        
+          yufulou&#39;s 
+        
+      .
+      Powered by <a href="//gohugo.io" target="_blank">Hugo</a>
+    </p>
+  </section>
+</section>
+
+    </div>
+    <a id="back-to-top" href="#" class="fa fa-arrow-up fa-border fa-2x"></a>
+    
+
+    
+      
+    
+
+    
+      
+      
+      
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/highlight.min.js"></script>
+        
+        
+        
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/r.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/yaml.min.js"></script>
+        <script src="//cdn.bootcss.com/highlight.js/9.11.0/languages/css.min.js"></script>
+        <script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+      
+    
+    
+    
+      <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/skel/3.0.1/skel.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.25/jquery.fancybox.min.js"></script>
+      <script src="/js/util.js"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/backToTop.js"></script>
+    
+
+    
+      
+        
+      
+    
+
+    
+    <script>hljs.initHighlightingOnLoad();</script>
+      <script src="//yihui.name/js/math-code.js"></script>
+<script async
+src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+
+  </body>
+</html>
+

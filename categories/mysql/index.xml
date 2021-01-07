@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>mysql on yufulou&#39;s </title>
+    <link>/categories/mysql/</link>
+    <description>Recent content in mysql on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 07 Jan 2021 14:20:38 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/mysql/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>[转]在MySQL中，如何计算一组数据的中位数？</title>
+      <link>/blog/select-medium-number/</link>
+      <pubDate>Thu, 07 Jan 2021 14:20:38 +0800</pubDate>
+      
+      <guid>/blog/select-medium-number/</guid>
+      <description>原文链接地址：https://learnku.com/articles/18390
+要得到一组数据的中位数（例如某个地区或某家公司的收入中位数），我们一般要将这一任务细分为 3 个小任务：
+ 将数据排序，并给每一行数据给出其在所有数据中的排名； 找出中位数的排名数字； 找出中间排名对应的值；  下面以某公司员工月收入为例，示例 MySQL 的一些复杂语句的使用。
+方法一 创建测试表 首先创建一个收入表，建表语句为：
+CREATE TABLE IF NOT EXISTS `employee` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(10) NOT NULL DEFAULT &#39;&#39;, `income` INT NOT NULL DEFAULT &#39;0&#39; ) ENGINE = InnoDB DEFAULT CHARSET = utf8; INSERT INTO `employee` (`name`, `income`) VALUES (&#39;麻子&#39;, 20000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;李四&#39;, 12000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;张三&#39;, 10000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;王二&#39;, 16000); INSERT INTO `employee` (`name`, `income`) VALUES (&#39;土豪&#39;, 40000); 完成任务 1 将数据排序，并给每一行数据给出其在所有数据中的排名：</description>
+    </item>
+    
+    <item>
+      <title>随想随写的mysql性能优化流水账</title>
+      <link>/blog/mysql-optimization-draft/</link>
+      <pubDate>Wed, 09 Oct 2013 17:48:04 +0800</pubDate>
+      
+      <guid>/blog/mysql-optimization-draft/</guid>
+      <description>总结mysql优化方式：
+1、 语句方面工具：
+a) Explain
+b) Set profiling=1
+2、 语句方面的注意事项：
+a) 降低每次查找的数据量，避免出现需要使用tmp file的情况
+b) 把in尽量写成exists，not in =&amp;gt; not exists
+c) 需要Like的场景尽量使用左匹配
+d) 如果可以把两次查找放到同一个sql中，并不增加语句复杂度，尽量这样做，对速度有帮助
+e) 可以在一定情况下，使用force/ignore/use index语句指定查询索引，提高速度
+f) 尽量not null
+g) 在字符串长度变化不大的场景下，用char替换varchar可提高查找速度
+h) 复杂的查询使用procedure，减少进程间交互
+i) 使用HIGH_PRIORITY提高需要尽快返回结果的查询的优先级
+j) 使用SQL_CALC_FOUND_ROWS进行分页的总数统计，少用一次count，对innodb查询作用比较大
+3、 提高innodb_buffer_pool_size，对innodb的插入查找速度都有帮助(innodb_log_file_size=innodb_buffer_pool_size/redo日志)
+4、 提高key_buffer_size可对myisam查询很有帮助
+5、 加入skip-name-resolve，避免mysql的dns反查
+6、 活用几种cache/buffer(sort_buffer_size:排序缓存，存储order by的中间结果，超过这个值则会使用tmp file；read_buffer_size:循序查找缓存；read_rnd_buffer_size:随机查找缓存；query_cache:语句缓存，增大可加快对更新不快的数据表的查询；join_buffer_size:联合查找的中间缓存) – 并不是越大越好，需要有个合适的值
+7、 Myisam使用concurrent_insert=2，在队尾插入，定期空闲时间optimize table，可保证查询速度的同时，不使表增大太快
+8、 使用slow_query_log记录慢查询，并进行优化
+9、 可定期analyze table，使mysql优化选择器选择更合适的方案
+10、 开启二进制日志(可用mixed方式)，可辅助redo日志进行数据库崩溃时的修复。（可定期检查并删除过期日志避免磁盘空间增大，如果场景数据增量比较稳定，用expire_logs_days即可）
+11、 分表，分区，垂直分割数据表（基本信息表、附加信息表）
+12、 通过replication做主从负载均衡
+13、 通过drbd+heartbeat做高可用</description>
+    </item>
+    
+    <item>
+      <title>mysql5.1.58 触发器中调用存储过程 出现“Table was not locked with LOCK TABLES”的解决办法</title>
+      <link>/blog/mysql-trigger-error/</link>
+      <pubDate>Wed, 29 Aug 2012 19:02:20 +0800</pubDate>
+      
+      <guid>/blog/mysql-trigger-error/</guid>
+      <description>第一次遇到这个问题，网上也没查到相关办法，特发博客记录一手
+先定义2个临时叫法：
+1级存储过程：触发器中直接调用的存储过程
+N+1级存储过程：1级存储过程调用的子存储过程，以及子存储过程调用的存储过程。。。。。
+先大概说一下：
+1、官方文档表示：如果运行了lock table，则以后对任何表进行操作前，都必须lock table，否则，就提示本文标题那个错误。
+2、有个特殊情况，就是，在被lock表的触发器中，如果写了对另外一个实体表的操作，则另外那个实体表自动被加相同的锁。该原则，适用于1级及N+1级所有存储过程，所有在操作涉及到的实体表都会自动被加相同的锁，所以都不会出错。
+3、但，如果被lock表的触发器的1级存储过程创建了一个临时表，则该临时表只能在本存储过程内被操作，N+1级存储过程想对其进行操作，则会提示：Table &amp;lsquo;xxxxx&amp;rsquo; was not locked with LOCK TABLES。
+4、存储过程中不能使用lock table语句
+然后，我就发现了一个有意思的办法，就是“声明”
+只要在N+1级存储过程中，这样声明一下1级存储过程创建的临时表名，就可以安全过关了：create temporary table if not exists xxxxx(col1 int);
+此时列名、类型都不需要一样
+今天时间不够了，下次试验一下prepare statement会不会有类似问题，但估计得有
+实例
+建表：
+触发器：
+1级存储过程直接操作：
+1级存储过程操作成功：
+N+1级存储过程不声明：
+N+1级存储过程调用失败：
+N+1级存储过程声明临时表（此时，声明不需要列名，列数，以及类型匹配）：
+N+1级存储过程调用成功（可以看到，此时，不严格的声明，不会对临时表结果造成影响）：</description>
+    </item>
+    
+    <item>
+      <title>在procedure中代替return的方法</title>
+      <link>/blog/replace-return-in-procedure/</link>
+      <pubDate>Wed, 23 May 2012 15:56:19 +0800</pubDate>
+      
+      <guid>/blog/replace-return-in-procedure/</guid>
+      <description>DELIMITER // DROP PROCEDURE IF EXISTS proc_test_leave; CREATE PROCEDURE proc_test_leave() begin declare ab varchar(10); label_leave:begin SET ab=&amp;quot;1&amp;quot;; if 1 then set ab=&amp;quot;2&amp;quot;; if 1 then SET ab=&amp;quot;3&amp;quot;; leave label_leave; end if; else leave label_leave; end if; end label_leave; select ab; END; // DELIMITER ; </description>
+    </item>
+    
+    <item>
+      <title>mysql utf8 中文字符 排序</title>
+      <link>/blog/mysql-sort-chinese/</link>
+      <pubDate>Sat, 04 Feb 2012 22:05:27 +0800</pubDate>
+      
+      <guid>/blog/mysql-sort-chinese/</guid>
+      <description>最原始的帖子我打开不开，就贴这个地址吧： http://adriano.blogbus.com/logs/14278134.html
+跟我测试的结果一样，所以网上那么多order by convert(字段 using gbk)都是怎么搞出来的啊？
+乘着放假，帮老大做个系统以减轻他的工作强度。
+用什么做，当然是ruby on rails+mysql啦。
+又是一番安装、配置。然后开始写代码。很多人遇到的中文问题，我在上一次做练习的时候已经遇到并解决了。
+当时发现，当浏览器使用简体中文gb2312时，ruby代码中的中文没有问题，但是从数据库中的中文是乱码。换成utf8，则相反，mysql中的中文正常，ruby中的代码有问题。当时，相关配置都没有做特别调整。后来的解决方案很简单，将ruby代码用utf8的格式存放。我一直在用editplus来编辑，因此只要另存为utf8格式，则一切搞定(提醒一下，用rails以及script\generate自动生成时，默认都是ansi，如果涉及到中文一定要改为utf8)。
+这一次驾轻就熟，直接用了上次的经验。因此中文显示一切正常。顶多在布局文件里加上charset设定。
+然而一切写完以后，才发现，按照中文字段进行排序，其结果始终很奇怪。几番搜索核查之后，得知是因为utf8中中文字符的顺序是乱得，而非拼音排序！
+解决的过程大致有四个阶段：
+一、首先当然是google和baidu,下面是被转载最多的文章，基本上用&amp;quot;mysql 中文排序&amp;quot;搜索，前n页都是对此的转载。提供了2种方法
+方法1，一种解决方法是对于包含中文的字段加上&amp;quot;binary&amp;quot;属性，使之作为二进制比较，例如将&amp;quot;name char(10)&amp;ldquo;改成&amp;quot;name char(10)binary&amp;rdquo;。方法2 ，如果你使用源码编译MySQL，可以编译MySQL时使用&amp;ndash;with&amp;ndash;charset=gbk 参数，这样MySQL就会直接支持中文查找和排序了。这里说的语焉不详，方法2，实验起来太过麻烦，而且我的实验机器是win，如何编译还不知道。而且实际上这意味着需要采用gbk作为中文存储的字符编码。方法1，较为简单，试验之，无效。原因后来才明白。
+二、后来查到这个网页，使我有点绝望
+http://www.5ivb.com/Info/68/3390242/
+我研究了一下，初步了解：用二进制 binary 排序的前提是把 gbk/gb2312 的汉字编码以 utf-8 的格式存进去，所以一个汉字被保存成 4 个字节，而不是真正的 3 个字节。如果数据库中真的以 utf-8 的字符集保存，则二进制 binary 排序会得出错误结果（非拼音排序）。另外，以 utf-8 保存 gbk/gb2312 的编码会带来 char_length() 错误的问题。基本有结果了，看了 mysql 的文档后，明白了直接的排序办法没有！ 让我们期待 utf8_chinese_ci 的发布。 在这之前只能考虑间接的办法了。三、于是开始决定放弃utf8，修改为gbk或者gb2312
+查看了若干网页，试验若干次，终于发现一下几点：
+1、我的浏览器没有gbk编码(可能没有安装)，它似乎看不了gbk的字符集的东西，那么想来很多浏览器默认也没有gbk编码，所以决定弃用gbk。(这一点没有仔细求证，或有不确之处，只是当时就这么想的)
+2、要将我做好的系统整个改成gb2312，需要做以下的事情：
+a.将所有的ruby文件改回ansi。
+b.在mysql中，设置服务器、数据库、表以及要排序的中文字段的字符集编码均设为gb2312，将排序方式设为gb2312_chinese_ci ，其中，服务器的字符集和排序方式在my.cnf中设置，后面的三个可以使用sql命令alter database或者alter table来设置，当然我是用phpadmin设置的。
+c.设置连接和客户端的字符集，其实我究竟设置的是哪一个我也不是很清楚，我设置的是ruby的database.yml
+adapter: mysql
+database:
+username: root
+password:
+host:
+encoding: gb2312</description>
+    </item>
+    
+  </channel>
+</rss>

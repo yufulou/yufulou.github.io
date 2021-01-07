@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>apache on yufulou&#39;s </title>
+    <link>/categories/apache/</link>
+    <description>Recent content in apache on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 17 Oct 2011 14:14:38 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/apache/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>centos上apache对下载限速问题，边研究边改～～</title>
+      <link>/blog/apache_rate_limit/</link>
+      <pubDate>Mon, 17 Oct 2011 14:14:38 +0800</pubDate>
+      
+      <guid>/blog/apache_rate_limit/</guid>
+      <description>LAMP下，总流量10MB/s下载速度，其中只想用一半带宽5MB/s做下载，另外一半带宽做升级，所以现在希望对下载的文件夹限速，现在的情况是这样的：
+1、mod_bw可以限制下载总速度，每个线程的下载最小速度，但是如果使用迅雷，则会超过最大速度，比如：
+BandWidth all 100（最大）
+MinBandWidth all 20 （最小10k）
+如果用迅雷下载，只对该原始地址，同时开10个线程，则最大速度会冲到200k（即最小速度*下载进程数）
+所以，mod_bw无论如何都是对迅雷无效的
+2、mod_limitipconn可以限制每个ip最多1个线程下载，这个确实可以限制迅雷的问题，但是，会造成每个内网用户同时只有一个人可以下载，这是希望最好可以避免的
+3、mod_cband，可以成功限制最大速度，但是暂时只找到了对整个虚拟目录限速的办法，这个即使回头找不到对目录限速的办法，做成多虚拟目录也可以解决，不过比较郁闷的问题是，他跟mod_bw的最小速度功能组合使用效果特别不好
+想到的解决办法：
+设置2个虚拟目录，下载和升级分别各自使用一个hostname，分别指向不同文件夹，分别对两个文件夹做最大下载速度限制
+会话平均带宽这个以后再说了，暂时没有啥好招
+如果谁有什么其他更方便的解决办法，请帮忙告诉我一下～～</description>
+    </item>
+    
+  </channel>
+</rss>

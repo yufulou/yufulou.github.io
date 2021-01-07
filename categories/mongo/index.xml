@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>mongo on yufulou&#39;s </title>
+    <link>/categories/mongo/</link>
+    <description>Recent content in mongo on yufulou&#39;s </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 21 Aug 2014 20:13:01 +0800</lastBuildDate>
+    
+	<atom:link href="/categories/mongo/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>mongodb本地表移库</title>
+      <link>/blog/mongo-move-data/</link>
+      <pubDate>Thu, 21 Aug 2014 20:13:01 +0800</pubDate>
+      
+      <guid>/blog/mongo-move-data/</guid>
+      <description>在网上找这种本地移表的方法，一直没找着，自己写了个凑合用,有时候好不容易写几行基础数据不容易啊，尤其mongodb。。。每次还得带着字段名。。。回头万一设计时候出错了也比较好改~~ 下面这种办法会报错：
+db.runCommand({cloneCollection:&amp;quot;db1.table_to_move&amp;quot;, from:&amp;quot;127.0.0.1:27017&amp;quot;}); { &amp;quot;errmsg&amp;quot; : &amp;quot;can&#39;t cloneCollection from self&amp;quot;, &amp;quot;ok&amp;quot; : 0 } use db1; var cursor = db.table_to_move.find(); use db2; while(cursor.hasNext()){ db2.table_to_move.insert(cursor.next()); } </description>
+    </item>
+    
+  </channel>
+</rss>
